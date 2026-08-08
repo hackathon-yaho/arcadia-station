@@ -25,6 +25,19 @@ class NpcResponseGuardTest {
         assertThat(guard.isAllowed(context, response)).isTrue();
     }
 
+    @Test
+    void rejectsGenericAssistantStyleEvenWhenFactIdsAreSafe() {
+        NpcTurnContext context = context(List.of("FACT-ALLOWED"));
+        NpcTurnResponse response = new NpcTurnResponse(
+                "차분히 정리해서 답하겠습니다. 확인할 수 있는 기록을 기준으로 하나씩 살펴보죠.",
+                NpcTurnResponse.Emotion.CALM,
+                List.of("FACT-ALLOWED"),
+                List.of()
+        );
+
+        assertThat(guard.isAllowed(context, response)).isFalse();
+    }
+
     private NpcTurnContext context(List<String> revealable) {
         return context(revealable, List.of("CLUE-1"));
     }

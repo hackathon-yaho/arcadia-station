@@ -16,12 +16,17 @@ import org.springframework.stereotype.Component;
 public class NpcEmotionPolicy {
 
     private static final Set<String> CONFRONTATIONAL_TERMS = Set.of(
-            "거짓", "거짓말", "범인", "살인", "범행", "숨기", "은폐", "모순",
+            "거짓", "거짓말", "범인", "용의자", "살인", "범행", "숨기", "은폐", "모순",
             "책임", "의심", "해명", "인정", "왜 했", "네가 했", "당신이 했"
     );
 
     private static final Set<String> ESCALATING_TERMS = Set.of(
-            "범인", "살인", "범행", "거짓말", "네가 했", "당신이 했", "인정해"
+            "범인", "용의자", "살인", "범행", "거짓말", "네가 했", "당신이 했", "인정해"
+    );
+
+    private static final Set<String> HOSTILE_TERMS = Set.of(
+            "닥쳐", "입 다물", "꺼져", "쓰레기", "최악의 답변", "헛소리", "개소리",
+            "목 닦", "목딲", "죽여", "죽인다", "가만 안 둬", "두고 봐"
     );
 
     /**
@@ -42,11 +47,11 @@ public class NpcEmotionPolicy {
     public Reply fallback(NpcTurnContext context) {
         NpcTurnResponse.Emotion emotion = chooseFallbackEmotion(context);
         return new Reply(emotion, switch (emotion) {
-            case CALM -> "차분히 정리해서 답하겠습니다. 확인할 수 있는 기록을 기준으로 하나씩 살펴보죠.";
-            case ANXIOUS -> "그 질문을 받으니 조심스러워지네요. 그래도 제가 확인할 수 있는 범위부터 차근차근 답하겠습니다.";
-            case EVASIVE -> "그 부분은 지금 단정해서 말하고 싶지 않습니다. 확인되는 기록에 관한 질문이라면 답하겠습니다.";
-            case ANGRY -> "추측으로 몰아붙이지는 말아 주세요. 확인되는 기록을 기준으로라면 답하겠습니다.";
-            case DEFENSIVE -> "제가 의심받는 건 이해하지만, 제시한 기록만으로 결론을 내리지는 말아 주세요. 확인되는 범위에서 설명하겠습니다.";
+            case CALM -> "제가 본 건 여기까지예요. 더 확인할 자료가 있다면 보여 주세요.";
+            case ANXIOUS -> "그렇게 몰아붙이면 저도 더 조심스러워져요. 제가 아는 건 이미 말씀드렸어요.";
+            case EVASIVE -> "그 부분은 지금 답하고 싶지 않아요. 다른 자료가 있다면 보여 주세요.";
+            case ANGRY -> "협박하듯 말하면 대답할 수 없어요. 근거가 있다면 보여 주세요.";
+            case DEFENSIVE -> "의심하시는 건 알겠어요. 하지만 제 말만으로 결론 내리진 말아 주세요.";
         });
     }
 
@@ -117,7 +122,7 @@ public class NpcEmotionPolicy {
 
     private boolean isHostile(NpcTurnContext context) {
         String question = normalizedQuestion(context);
-        return question.contains("닥쳐") || question.contains("입 다물") || question.contains("쓰레기");
+        return HOSTILE_TERMS.stream().anyMatch(question::contains);
     }
 
     private NpcTurnResponse.Emotion previousEmotion(NpcTurnContext context) {

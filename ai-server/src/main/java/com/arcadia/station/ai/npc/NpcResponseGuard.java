@@ -7,6 +7,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class NpcResponseGuard {
 
+    private static final Set<String> GENERIC_ASSISTANT_PHRASES = Set.of(
+            "차분히 정리해서 답하겠습니다",
+            "확인할 수 있는 기록을 기준으로 하나씩 살펴보죠"
+    );
+
     private final NpcEmotionPolicy emotions;
 
     public NpcResponseGuard(NpcEmotionPolicy emotions) {
@@ -16,8 +21,12 @@ public class NpcResponseGuard {
     public boolean isAllowed(NpcTurnContext context, NpcTurnResponse response) {
         if (response == null
                 || response.dialogue() == null
+                || response.dialogue().isBlank()
                 || response.emotion() == null
                 || response.revealedFactIds() == null) {
+            return false;
+        }
+        if (GENERIC_ASSISTANT_PHRASES.stream().anyMatch(response.dialogue()::contains)) {
             return false;
         }
         Set<String> revealable = Set.copyOf(context.revealableFactIds());

@@ -73,6 +73,23 @@ class NpcEmotionPolicyTest {
         assertThat(policy.fallback(context).emotion()).isEqualTo(NpcTurnResponse.Emotion.DEFENSIVE);
     }
 
+    @Test
+    void threatAndAccusationGetANaturalBoundaryInsteadOfCalmModeratorTone() {
+        NpcTurnContext context = context(
+                List.of("침착함", "전문가적", "정보를 선택적으로 공개함"),
+                "최악의 답변이군. 결국 너 혼자만의 주장일 뿐이잖아. 넌 최우선 용의자야. 목딲고 기다리죠.",
+                List.of(),
+                List.of()
+        );
+
+        NpcEmotionPolicy.Reply reply = policy.fallback(context);
+
+        assertThat(reply.emotion()).isEqualTo(NpcTurnResponse.Emotion.ANGRY);
+        assertThat(reply.dialogue())
+                .isEqualTo("협박하듯 말하면 대답할 수 없어요. 근거가 있다면 보여 주세요.")
+                .doesNotContain("차분히 정리해서");
+    }
+
     private NpcTurnContext context(
             List<String> traits,
             String question,
