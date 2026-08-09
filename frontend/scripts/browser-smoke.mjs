@@ -107,14 +107,14 @@ try {
     fullPage: true,
   });
   await page.locator(".hud-layer").waitFor({ state: "visible" });
-  stage("waiting for the 3D station");
+  stage("waiting for the station layout");
   await page.waitForFunction(
     () => document.querySelectorAll(".scene-boot").length === 0,
     undefined,
     { timeout: 30_000 },
   );
   await page.waitForFunction(
-    () => Boolean(document.querySelector("canvas")?.dataset.cameraPosition),
+    () => Boolean(document.querySelector("canvas.station-canvas")?.dataset.playerPosition),
     undefined,
     { timeout: 5_000 },
   );
@@ -166,41 +166,49 @@ try {
     fullPage: true,
   });
 
-  stage("checking continuous 3D movement");
-  const cameraBeforeMovement = await page.locator("canvas").getAttribute("data-camera-position");
+  const playerPosition = () =>
+    page.locator("canvas.station-canvas").getAttribute("data-player-position");
+
+  stage("checking continuous movement");
+  const positionBeforeMovement = await playerPosition();
   await page.keyboard.down("w");
   await page.waitForTimeout(700);
   await page.keyboard.up("w");
   await page.waitForTimeout(150);
-  const cameraAfterMovement = await page.locator("canvas").getAttribute("data-camera-position");
+  const positionAfterMovement = await playerPosition();
   const movementDistance = positionDistance(
-    parsePosition(cameraBeforeMovement),
-    parsePosition(cameraAfterMovement),
+    parsePosition(positionBeforeMovement),
+    parsePosition(positionAfterMovement),
   );
   if (movementDistance < 0.5) {
     throw new Error(
-      `Player did not move after holding W: ${cameraBeforeMovement} -> ${cameraAfterMovement}`,
+      `Player did not move after holding W: ${positionBeforeMovement} -> ${positionAfterMovement}`,
     );
   }
 
-  stage("approaching a zone sign");
-  await page.keyboard.down("a");
-  await page.waitForTimeout(900);
-  await page.keyboard.up("a");
-  await page.keyboard.down("w");
-  await page.waitForTimeout(2_800);
-  await page.keyboard.up("w");
-  await page.waitForTimeout(150);
+  // 사령관실까지 걸어가 조사 표식에 닿는다. 근접 프롬프트가 3D의 조준선을 대신한다.
+  // 허브 한가운데에는 코어 기둥이 서 있어서 직진으로는 못 간다. 실제 플레이처럼 돌아간다.
+  stage("walking to the command room");
+  const walk = async (key, ms) => {
+    await page.keyboard.down(key);
+    await page.waitForTimeout(ms);
+    await page.keyboard.up(key);
+    await page.waitForTimeout(120);
+  };
+  await walk("d", 700);
+  await walk("w", 2_200);
+  await walk("a", 700);
+  await walk("w", 3_200);
+  await page.waitForTimeout(200);
   await page.screenshot({
     path: path.join(outputDir, "02-zone-sign.png"),
     fullPage: true,
   });
+  if (!(await page.locator(".interaction-prompt").isVisible())) {
+    throw new Error("Walking into the command room did not surface an interaction prompt.");
+  }
 
-  await page.bringToFront();
-  await page.locator("canvas").click({ position: { x: 720, y: 450 } });
-  await page.evaluate(() => document.exitPointerLock());
-  await page.waitForTimeout(100);
-  const stableCameraPosition = await page.locator("canvas").getAttribute("data-camera-position");
+  const stablePosition = await playerPosition();
 
   await page.keyboard.press("Tab");
   stage("checking notebook and settings overlays");
@@ -368,10 +376,10 @@ try {
     fullPage: true,
   });
 
-  const canvas = page.locator("canvas");
+  const canvas = page.locator("canvas.station-canvas");
   const canvasBox = await canvas.boundingBox();
   if (!canvasBox || canvasBox.width < 100 || canvasBox.height < 100) {
-    throw new Error("3D canvas did not render at the expected size.");
+    throw new Error("Station canvas did not render at the expected size.");
   }
 
   const report = {
@@ -379,7 +387,7 @@ try {
     title: await page.title(),
     canvas: canvasBox,
     stacking: await page.evaluate(() => {
-      const canvas = document.querySelector("canvas");
+      const canvas = document.querySelector("canvas.station-canvas");
       const shell = document.querySelector(".game-shell");
       return {
         canvas: canvas
@@ -387,9 +395,7 @@ try {
               position: getComputedStyle(canvas).position,
               zIndex: getComputedStyle(canvas).zIndex,
               transform: getComputedStyle(canvas).transform,
-              cameraPosition: canvas.dataset.cameraPosition,
-              cameraDirection: canvas.dataset.cameraDirection,
-              renderStats: canvas.dataset.renderStats,
+              playerPosition: canvas.dataset.playerPosition,
             }
           : null,
         children: shell
@@ -416,13 +422,9 @@ try {
         text: element.textContent?.replace(/\s+/g, " ").trim().slice(0, 180),
       };
     }),
-    webglRenderer: await page.evaluate(() => {
-      const canvas = document.querySelector("canvas");
-      return canvas?.dataset.engine ?? null;
-    }),
     movement: {
-      before: cameraBeforeMovement,
-      after: cameraAfterMovement,
+      before: positionBeforeMovement,
+      after: positionAfterMovement,
       distance: Number(movementDistance.toFixed(2)),
     },
     interrogation: {
@@ -437,7 +439,7 @@ try {
       firstStep: tourFirstStep,
       thirdStep: tourThirdStep,
     },
-    stableCameraPosition,
+    stablePosition,
     consoleErrors,
     pageErrors,
   };
@@ -482,9 +484,9 @@ try {
   });
   await mobilePage.locator(".primary-action").click();
   await mobilePage.locator(".mobile-controls").waitFor({ state: "visible" });
-  await mobilePage.locator("canvas").waitFor({ state: "visible" });
+  await mobilePage.locator("canvas.station-canvas").waitFor({ state: "visible" });
   await mobilePage.waitForFunction(
-    () => Boolean(document.querySelector("canvas")?.dataset.cameraPosition),
+    () => Boolean(document.querySelector("canvas.station-canvas")?.dataset.playerPosition),
   );
   await mobilePage.waitForTimeout(2_500);
   await mobilePage.screenshot({
@@ -539,11 +541,13 @@ try {
     `${JSON.stringify(report, null, 2)}\n`,
   );
   console.log(JSON.stringify(report, null, 2));
-  const cameraY = Number(stableCameraPosition?.split(",")[1]);
+  // 좌표를 계속 내보내고 있고, 걸어서 사령관실까지 실제로 이동했는지 본다.
+  // 3D 때는 카메라 높이를 봤지만 탑다운에는 높이가 없다.
+  const [finalX, finalZ] = parsePosition(stablePosition);
+  const walkedNorth = Number.isFinite(finalZ) && finalZ < -18;
   if (
-    !report.webglRenderer ||
-    !Number.isFinite(cameraY) ||
-    cameraY < 0.5 ||
+    !Number.isFinite(finalX) ||
+    !walkedNorth ||
     consoleErrors.length ||
     pageErrors.length
   ) {

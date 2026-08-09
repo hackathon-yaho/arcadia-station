@@ -1,15 +1,13 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { GameUI } from "./ui/GameUI";
 import { useGameStore } from "./store/gameStore";
-import { AudioDirector } from "./game/AudioDirector";
+import { AudioDirector } from "./audio/AudioDirector";
 import { SettingsPanel } from "./ui/SettingsPanel";
 import { MobileControls } from "./ui/MobileControls";
+import { StationCanvas } from "./ui/StationCanvas";
 import { useSettingsStore } from "./store/settingsStore";
 import { INVESTIGATION_OBJECTS } from "./data/investigation";
-
-const ArcadiaScene = lazy(() =>
-  import("./game/ArcadiaScene").then((module) => ({ default: module.ArcadiaScene })),
-);
+import { preloadPortraits } from "./data/characters";
 
 declare global {
   interface Window {
@@ -32,7 +30,6 @@ declare global {
 
 export default function App() {
   const layer = useGameStore((state) => state.layer);
-  const graphicsQuality = useSettingsStore((state) => state.graphicsQuality);
   const reducedMotion = useSettingsStore((state) => state.reducedMotion);
   const [sceneReady, setSceneReady] = useState(false);
   const handleSceneReady = useCallback(() => setSceneReady(true), []);
@@ -40,6 +37,9 @@ export default function App() {
   useEffect(() => {
     if (layer === "opening") setSceneReady(false);
   }, [layer]);
+
+  // 심문 창이 열리는 순간 초상이 비어 있지 않도록 미리 받아 둔다.
+  useEffect(() => preloadPortraits(), []);
 
   // 안내는 HUD 요소를 하나씩 짚어 주므로 정거장이 실제로 떠 있을 때만 시작한다.
   useEffect(() => {
@@ -264,18 +264,14 @@ export default function App() {
   return (
     <main className="game-shell">
       {layer !== "opening" && (
-        <Suspense fallback={<SceneBootScreen />}>
-          <ArcadiaScene onReady={handleSceneReady} />
+        <>
+          <StationCanvas onReady={handleSceneReady} />
           {!sceneReady && <SceneBootScreen />}
-        </Suspense>
-      )}
-      {layer !== "opening" && (
-        <div
-          className={`scene-grade scene-grade--${graphicsQuality.toLowerCase()} ${
-            reducedMotion ? "is-reduced" : ""
-          }`}
-          aria-hidden="true"
-        />
+          <div
+            className={`scene-grade ${reducedMotion ? "is-reduced" : ""}`}
+            aria-hidden="true"
+          />
+        </>
       )}
       <GameUI />
       <MobileControls />
@@ -289,8 +285,8 @@ function SceneBootScreen() {
   return (
     <div className="scene-boot" role="status">
       <i />
-      <span>STATION GEOMETRY</span>
-      <strong>아르카디아 공간 데이터 복원 중</strong>
+      <span>STATION LAYOUT</span>
+      <strong>아르카디아 배치도 복원 중</strong>
     </div>
   );
 }

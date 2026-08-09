@@ -9,23 +9,21 @@
   },
   "stacking": {
     "canvas": {
-      "position": "static",
-      "zIndex": "auto",
+      "position": "absolute",
+      "zIndex": "0",
       "transform": "none",
-      "cameraPosition": "0.00,1.51,6.00",
-      "cameraDirection": "0.00,-0.27,-0.96",
-      "renderStats": "{\"calls\":198,\"triangles\":27188,\"sceneChildren\":32}"
+      "playerPosition": "0.00,6.00"
     },
     "children": [
       {
-        "tag": "DIV",
-        "className": "scene-canvas",
+        "tag": "CANVAS",
+        "className": "station-canvas",
         "position": "absolute",
         "zIndex": "0"
       },
       {
         "tag": "DIV",
-        "className": "scene-grade scene-grade--low ",
+        "className": "scene-grade ",
         "position": "absolute",
         "zIndex": "1"
       },
@@ -47,16 +45,15 @@
     "display": "block",
     "visibility": "visible",
     "opacity": "1",
-    "color": "rgb(230, 229, 223)",
+    "color": "rgb(229, 228, 224)",
     "zIndex": "5",
     "width": 1440,
     "height": 900,
     "text": "ARK SECURITYINCIDENT // 072진행 단계1일차2일차추리지금 할 일2일차 조사기록을 교차 검증하세요새로 열린 구역을 조사하고 1일차 진술과 대조해 모순을 찾습니다. 정리되면 TAB을 눌러 사건 재구성에서 범인을 지목하세요.증거 기록 04 / 04승무원 심문 01 / 03Q 조사 스캔TAB 사건 수첩안내 ?"
   },
-  "webglRenderer": "three.js r185",
   "movement": {
-    "before": "0.00,1.51,6.00",
-    "after": "-0.00,1.51,2.89",
+    "before": "0.00,6.00",
+    "after": "0.00,2.89",
     "distance": 3.11
   },
   "interrogation": {
@@ -81,7 +78,7 @@
     "firstStep": "1 / 8",
     "thirdStep": "3 / 8"
   },
-  "stableCameraPosition": "-4.53,1.51,-8.46",
+  "stablePosition": "-0.02,-24.21",
   "consoleErrors": [],
   "pageErrors": [],
   "persistedResultRecovered": true,

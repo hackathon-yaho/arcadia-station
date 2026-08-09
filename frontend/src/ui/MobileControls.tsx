@@ -13,7 +13,6 @@ export function MobileControls() {
   const openInspection = useGameStore((state) => state.openInspection);
   const activateScan = useGameStore((state) => state.activateScan);
   const toggleNotebook = useGameStore((state) => state.toggleNotebook);
-  const lastPoint = useRef<{ x: number; y: number } | null>(null);
 
   if (layer !== "playing") return null;
 
@@ -36,31 +35,7 @@ export function MobileControls() {
         <button type="button" aria-label="오른쪽 이동" {...bindMove("KeyD")}>▶</button>
       </div>
 
-      <div
-        className="mobile-look"
-        aria-label="시점 이동 영역"
-        onPointerDown={(event) => {
-          event.currentTarget.setPointerCapture(event.pointerId);
-          lastPoint.current = { x: event.clientX, y: event.clientY };
-        }}
-        onPointerMove={(event) => {
-          if (!lastPoint.current || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
-          const detail = {
-            x: event.clientX - lastPoint.current.x,
-            y: event.clientY - lastPoint.current.y,
-          };
-          lastPoint.current = { x: event.clientX, y: event.clientY };
-          window.dispatchEvent(new CustomEvent("arcadia:look", { detail }));
-        }}
-        onPointerUp={() => {
-          lastPoint.current = null;
-        }}
-        onPointerCancel={() => {
-          lastPoint.current = null;
-        }}
-      >
-        <span>DRAG TO LOOK</span>
-      </div>
+      {/* 탑다운에는 시점이 없다. 3D의 드래그 영역이 있던 자리는 비워 둔다. */}
 
       <div className="mobile-actions">
         <button type="button" onClick={activateScan}>SCAN</button>

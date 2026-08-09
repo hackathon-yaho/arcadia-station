@@ -1,11 +1,5 @@
 import { useEffect } from "react";
-import { useSettingsStore, type GraphicsQuality } from "../store/settingsStore";
-
-const QUALITY_LABELS: Record<GraphicsQuality, string> = {
-  LOW: "성능",
-  MEDIUM: "균형",
-  HIGH: "시네마틱",
-};
+import { useSettingsStore } from "../store/settingsStore";
 
 export function SettingsPanel() {
   const settings = useSettingsStore();
@@ -32,35 +26,6 @@ export function SettingsPanel() {
           </div>
           <button type="button" onClick={() => settings.setOpen(false)}>닫기 <kbd>ESC</kbd></button>
         </header>
-
-        <div className="settings-group">
-          <label>그래픽 품질</label>
-          <div className="segmented-control">
-            {(Object.keys(QUALITY_LABELS) as GraphicsQuality[]).map((quality) => (
-              <button
-                key={quality}
-                className={settings.graphicsQuality === quality ? "is-active" : ""}
-                type="button"
-                onClick={() => settings.setGraphicsQuality(quality)}
-              >
-                <span>{QUALITY_LABELS[quality]}</span>
-                <small>{quality}</small>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <label className="range-setting">
-          <span>마우스 감도 <strong>{settings.mouseSensitivity.toFixed(1)}</strong></span>
-          <input
-            type="range"
-            min="0.4"
-            max="2"
-            step="0.1"
-            value={settings.mouseSensitivity}
-            onChange={(event) => settings.setMouseSensitivity(Number(event.target.value))}
-          />
-        </label>
 
         <label className="range-setting">
           <span>전체 음량 <strong>{Math.round(settings.masterVolume * 100)}%</strong></span>

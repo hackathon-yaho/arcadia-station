@@ -19,8 +19,10 @@ const compressed = await Promise.all(
   })),
 );
 const largest = compressed.sort((a, b) => b.bytes - a.bytes)[0];
+// 3D 런타임을 걷어내면서 지연 청크(three + rapier)가 사라졌다. 이제 가장 큰 청크는
+// 초기 진입 번들 자체다. 예산을 그 자리에 맞춰 조여 둬야 무거운 것이 다시 들어올 때 걸린다.
 const initialBudget = 180 * 1024;
-const lazyChunkBudget = 1350 * 1024;
+const lazyChunkBudget = 220 * 1024;
 
 console.log(
   `Initial JS: ${(initialBytes / 1024).toFixed(1)} KiB gzip / ${initialBudget / 1024} KiB budget`,

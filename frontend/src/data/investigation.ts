@@ -305,11 +305,11 @@ export const TIMELINE = [
 ];
 
 export const SUSPECTS = [
-  { id: "MAYA", name: "마야 헨드릭스", role: "부사령관", color: "#d65a43" },
-  { id: "JUNHO", name: "백준호", role: "수석 엔지니어", color: "#e79b53" },
-  { id: "SOPHIA", name: "소피아 알바레즈", role: "의무관", color: "#65cbb7" },
-  { id: "KASIM", name: "카심 나예리", role: "통신정보장교", color: "#8f86e8" },
-  { id: "YUNA", name: "유나 조", role: "화물관리관", color: "#dc7ca5" },
+  { id: "MAYA", name: "마야 헨드릭스", role: "부사령관", color: "#a85040" },
+  { id: "JUNHO", name: "백준호", role: "수석 엔지니어", color: "#b58a52" },
+  { id: "SOPHIA", name: "소피아 알바레즈", role: "의무관", color: "#7f9689" },
+  { id: "KASIM", name: "카심 나예리", role: "통신정보장교", color: "#82799c" },
+  { id: "YUNA", name: "유나 조", role: "화물관리관", color: "#a4737f" },
 ];
 
 export type DialogueChoice = {

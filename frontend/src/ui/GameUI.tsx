@@ -12,12 +12,7 @@ import {
   type EvidenceTag,
   type NotebookTab,
 } from "../store/gameStore";
-import {
-  DEFAULT_QUALITY,
-  recommendedQuality,
-  useSettingsStore,
-  type GraphicsQuality,
-} from "../store/settingsStore";
+import { useSettingsStore } from "../store/settingsStore";
 import {
   useCompleteDay,
   useCreateSession,
@@ -33,6 +28,7 @@ import {
 import { validateTheory } from "../domain/theoryValidation";
 import { ROLE_SOURCE_FIELD } from "../api/backendContract";
 import { GuideTour, NOTEBOOK_TOUR_STEPS, PLAY_TOUR_STEPS } from "./GuideTour";
+import { Portrait, type PortraitState } from "./Portrait";
 import type {
   DiscoveredEvidence,
   EvidenceType,
@@ -154,79 +150,6 @@ function useSuspects() {
   );
 }
 
-const QUALITY_CHOICES: Array<{
-  id: GraphicsQuality;
-  label: string;
-  detail: string;
-}> = [
-  {
-    id: "LOW",
-    label: "성능 우선",
-    detail: "그림자를 끄고 해상도를 낮춥니다. 내장 그래픽 노트북과 모바일에 권장합니다.",
-  },
-  {
-    id: "MEDIUM",
-    label: "균형",
-    detail: "그림자를 유지하면서 해상도를 조금 낮춥니다.",
-  },
-  {
-    id: "HIGH",
-    label: "시네마틱",
-    detail: "그림자와 고해상도를 모두 켭니다. 외장 그래픽에 권장합니다.",
-  },
-];
-
-/**
- * 진입 전 그래픽 품질 선택.
- *
- * 설정 창은 정거장에 들어간 뒤에만 열 수 있어서, 저사양 기기는 이미 프레임이 무너진 화면을
- * 본 다음에야 품질을 내릴 수 있었다. 처음 만나는 화면에서 미리 고르게 한다.
- *
- * 모두 성능 우선에서 시작하고, 여유가 있는 기기에는 더 올려도 된다고 알려 준다. 낮게 시작해서
- * 올리는 쪽이 높게 시작해서 첫인상을 잃는 것보다 낫다.
- */
-function QualityPicker() {
-  const graphicsQuality = useSettingsStore((state) => state.graphicsQuality);
-  const setGraphicsQuality = useSettingsStore((state) => state.setGraphicsQuality);
-  const chosen = useSettingsStore((state) => state.graphicsQualityChosen);
-  const recommended = useMemo(() => recommendedQuality(), []);
-  const selected = QUALITY_CHOICES.find((choice) => choice.id === graphicsQuality);
-  const defaultLabel = QUALITY_CHOICES.find((choice) => choice.id === DEFAULT_QUALITY)?.label;
-  const headroomLabel =
-    recommended === DEFAULT_QUALITY
-      ? null
-      : QUALITY_CHOICES.find((choice) => choice.id === recommended)?.label;
-
-  return (
-    <div className="opening-quality" role="group" aria-label="그래픽 품질">
-      <header>
-        <span>GRAPHICS</span>
-        <p>진입 후 <kbd>ESC</kbd> 설정에서 언제든 바꿀 수 있습니다.</p>
-      </header>
-      <div className="segmented-control">
-        {QUALITY_CHOICES.map((choice) => (
-          <button
-            key={choice.id}
-            type="button"
-            className={graphicsQuality === choice.id ? "is-active" : ""}
-            onClick={() => setGraphicsQuality(choice.id)}
-          >
-            <span>{choice.label}</span>
-            <small>{choice.id === DEFAULT_QUALITY ? "기본" : choice.id}</small>
-          </button>
-        ))}
-      </div>
-      <small>
-        {chosen
-          ? selected?.detail
-          : `안정적인 프레임을 위해 ${defaultLabel}으로 시작합니다.${
-              headroomLabel ? ` 이 기기는 ${headroomLabel}까지 올려도 됩니다.` : ""
-            }`}
-      </small>
-    </div>
-  );
-}
-
 function OpeningOverlay() {
   const beginInvestigation = useGameStore((state) => state.beginInvestigation);
   const syncCaseState = useGameStore((state) => state.syncCaseState);
@@ -292,8 +215,6 @@ function OpeningOverlay() {
             <dd className="danger-text">완전 두절</dd>
           </div>
         </dl>
-
-        <QualityPicker />
 
         <button className="primary-action" type="button" onClick={enterStation}>
           <span>보안 권한으로 현장 진입</span>
@@ -362,7 +283,7 @@ const PREP_STORY: Record<SessionPrepStage, { caption: string; lines: string[] }>
 };
 
 const PREP_TIPS = [
-  "조준점을 오브젝트에 맞추고 E를 누르면 조사합니다.",
+  "조사 표식에 다가가 E를 누르면 조사합니다.",
   "무엇을 조사할지 모르겠으면 Q로 주변을 스캔하세요.",
   "TAB으로 사건 수첩을 열어 확보한 증거를 확인합니다.",
   "사건마다 단서 배치가 달라서, 아무것도 나오지 않는 오브젝트도 있습니다.",
@@ -502,13 +423,13 @@ function describeObjective(context: {
   if (context.recordsComplete) {
     return {
       title: "승무원을 심문하세요",
-      body: `각 구역의 승무원을 조준하고 E로 말을 겁니다. 1일차에는 ${REQUIRED_INTERVIEWS}명 이상 심문해야 합니다.`,
+      body: `각 구역에 흩어진 승무원에게 다가가 E로 말을 겁니다. 1일차에는 ${REQUIRED_INTERVIEWS}명 이상 심문해야 합니다.`,
     };
   }
   return {
     title: "정거장을 탐색해 증거를 찾으세요",
     body:
-      "조준점을 오브젝트에 맞추고 E로 조사합니다. 무엇을 조사할지 모르겠으면 Q로 주변을 스캔하세요.",
+      "WASD로 걸으며 마름모 표식에 다가가 E로 조사합니다. 붉은 표식이 1일차 필수 기록이고, 무엇을 조사할지 모르겠으면 Q로 주변을 스캔하세요.",
   };
 }
 
@@ -581,22 +502,18 @@ function MissionHud() {
         )}
       </aside>
 
-      <div className={`crosshair ${focused ? "is-focused" : ""}`} data-tour="crosshair">
-        <i />
-        <i />
-        <i />
-        <i />
+      {/* 조준점이 있던 자리. 탑다운에는 시선이 없으므로 가까이 간 대상만 알려 준다. */}
+      <div className="interaction-prompt" data-tour="prompt" hidden={!focused}>
+        {focused && (
+          <>
+            <kbd>E</kbd>
+            <div>
+              <span>{KIND_LABELS[focused.kind]}</span>
+              <strong>{focused.title}</strong>
+            </div>
+          </>
+        )}
       </div>
-
-      {focused && (
-        <div className="interaction-prompt">
-          <kbd>E</kbd>
-          <div>
-            <span>{KIND_LABELS[focused.kind]}</span>
-            <strong>{focused.title}</strong>
-          </div>
-        </div>
-      )}
 
       <div className="hud-controls">
         {!hasMoved && <span><kbd>WASD</kbd> 이동</span>}
@@ -985,7 +902,8 @@ function SuspectsTab() {
       {suspects.map((suspect, index) => (
         <article key={suspect.id}>
           <div className="suspect-number" style={{ "--suspect": suspect.color } as React.CSSProperties}>
-            {String(index + 1).padStart(2, "0")}
+            <Portrait id={suspect.id} rim={false} />
+            <b>{String(index + 1).padStart(2, "0")}</b>
           </div>
           <div>
             <span>{suspect.role}</span>
@@ -1581,6 +1499,14 @@ function InterrogationPanel() {
   const askedLabels = new Set(
     turns.filter((turn) => turn.kind === "choice").map((turn) => turn.question),
   );
+  // 초상 연출. 증거를 들이민 직후에는 압박, 답변이 오는 동안에는 발화로 둔다.
+  const lastTurn = turns[turns.length - 1];
+  const portraitState: PortraitState =
+    lastTurn?.kind === "evidence" && lastTurn.answer === null
+      ? "pressed"
+      : lastTurn?.answer !== null || turns.length === 0
+        ? "speaking"
+        : "idle";
   // 첫 질문은 정적 목록에서 고르고, 한 번 오간 뒤부터는 서버가 제안한 후속 질문을 보여준다.
   // 서버가 제안을 주지 않은 턴에서는 다시 정적 목록으로 돌아가 선택지가 비지 않게 한다.
   const showFollowUps = turns.length > 0 && followUps.length > 0;
@@ -1602,12 +1528,8 @@ function InterrogationPanel() {
 
       <div className="interrogation-layout">
         <aside className="suspect-portrait">
-          <div className="portrait-grid" />
-          <div className="portrait-silhouette">
-            <i />
-            <i />
-          </div>
-          <div className="portrait-id">{target.title.slice(0, 1)}</div>
+          {/* 마지막 문답이 증거 제시였고 답을 기다리는 중이면 압박 상태로 보여 준다. */}
+          <Portrait id={npcId} state={portraitState} className="suspect-portrait__art" />
           <footer>
             <span>{target.eyebrow}</span>
             <strong>{target.title}</strong>
@@ -1639,10 +1561,15 @@ function InterrogationPanel() {
                     className={`transcript-turn${turn.answer === null ? " is-pending" : ""}`}
                   >
                     <div className="interrogator-query">
-                      <span>
-                        {turn.kind === "evidence" ? "INVESTIGATOR // EVIDENCE" : "INVESTIGATOR // QUERY"}
-                      </span>
-                      <p>{turn.question}</p>
+                      <Portrait id="PLAYER" rim={false} className="interrogator-face" />
+                      <div>
+                        <span>
+                          {turn.kind === "evidence"
+                            ? "INVESTIGATOR // EVIDENCE"
+                            : "INVESTIGATOR // QUERY"}
+                        </span>
+                        <p>{turn.question}</p>
+                      </div>
                     </div>
                     <blockquote className={subtitles ? "is-subtitled" : ""}>
                       {turn.answer ?? "응답을 수신하고 있습니다…"}
@@ -2200,18 +2127,23 @@ function TrialScreen() {
         <StageIndicator current="DEDUCTION" />
       </header>
 
+      {/* 지목된 인물만 앞으로·컬러로 세운다. 3D가 못 만들던 법정의 시선이 여기서 나온다. */}
       <div className="trial-jury">
-        {suspects.map((suspect) => (
-          <div
-            key={suspect.id}
-            className={suspect.id === accused.id ? "is-accused" : ""}
-            style={{ "--suspect": suspect.color } as React.CSSProperties}
-          >
-            <i>{suspect.name.slice(0, 1)}</i>
-            <span>{suspect.role}</span>
-            <strong>{suspect.name}</strong>
-          </div>
-        ))}
+        {suspects.map((suspect) => {
+          const isAccused = suspect.id === accused.id;
+          return (
+            <div
+              key={suspect.id}
+              className={isAccused ? "is-accused" : ""}
+              style={{ "--suspect": suspect.color } as React.CSSProperties}
+            >
+              {isAccused && <em className="trial-seal">ACCUSED</em>}
+              <Portrait id={suspect.id} state={isAccused ? "culprit" : "excluded"} />
+              <span>{suspect.role}</span>
+              <strong>{suspect.name}</strong>
+            </div>
+          );
+        })}
       </div>
 
       <main className="trial-main">
