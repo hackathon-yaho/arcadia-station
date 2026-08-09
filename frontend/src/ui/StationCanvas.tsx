@@ -9,9 +9,11 @@ import {
   SPAWN,
   WALLS,
   zoneColor,
+  type Box,
+  type Prop,
 } from "../data/stationMap";
 import { INVESTIGATION_OBJECTS, REQUIRED_SCENE_IDS } from "../data/investigation";
-import { characterFor, loadedPortrait } from "../data/characters";
+import { characterFor } from "../data/characters";
 import {
   axesFrom,
   facingFrom,
@@ -20,6 +22,15 @@ import {
   roomAt,
   type Vec2,
 } from "../domain/movement";
+import {
+  FIGURE_HEIGHT,
+  TILT,
+  drawFigure,
+  drawProp,
+  propHeight,
+  type FigureState,
+  type View,
+} from "./miniatures";
 import { useGameStore } from "../store/gameStore";
 import { useSettingsStore } from "../store/settingsStore";
 
@@ -45,8 +56,49 @@ const VIEW_HEIGHT = 17;
  */
 const LAMP_RADIUS = 8.4;
 
-const PLAYER_LOOK = { accent: "#c8bda6", uniform: "#cfc6b7", skin: "#b98f77" };
 const REQUIRED = new Set<string>(REQUIRED_SCENE_IDS);
+
+/** 벽 높이(m). 세워 올려야 정거장이 도면이 아니라 모형으로 보인다. */
+const WALL_HEIGHT = 1.1;
+
+/** `outer`가 `inner`를 통째로 품는지. */
+const contains = (outer: Box, inner: Box) =>
+  Math.abs(outer.x - inner.x) + inner.w / 2 <= outer.w / 2 &&
+  Math.abs(outer.z - inner.z) + inner.d / 2 <= outer.d / 2;
+
+/**
+ * 앞뒤 순서를 미리 정해 둔 집기.
+ *
+ * 집기를 세워 올리면 겹칠 때 누가 앞인지가 생긴다. 아래쪽(z가 큰 쪽)에 있는 것이 앞이므로
+ * 바닥 자국의 아래 모서리로 정렬한다. 자리는 고정이라 프레임마다 다시 정렬할 이유가 없다.
+ *
+ * 다만 큰 물건 위에 작은 물건이 얹힌 경우 — 책상 위의 단말, 허브 단 위의 코어 기둥 — 는
+ * 큰 쪽의 앞 모서리가 더 가까워서 그대로 두면 받침이 얹힌 것을 덮어 버린다. 얹힌 쪽은
+ * 받침의 순서를 물려받아 바로 뒤에 그린다.
+ */
+const SORTED_PROPS = PROPS.map((prop) => {
+  const holder = PROPS.filter((other) => other !== prop && contains(other, prop)).sort(
+    (x, y) => x.w * x.d - y.w * y.d,
+  )[0];
+  return { prop, depth: holder ? holder.z + holder.d / 2 + 0.001 : prop.z + prop.d / 2 };
+}).sort((a, b) => a.depth - b.depth);
+
+/**
+ * 조사 지점이 얹혀 있는 집기.
+ *
+ * 표식과 이름표를 그 물건의 키만큼 띄우기 위해 필요하다. 지점을 품는 상자가 여럿이면
+ * (책상 위의 단말처럼) 가장 작은 것이 그 지점의 정체다.
+ */
+const PROP_UNDER = new Map<string, Prop>(
+  MAP_OBJECTS.flatMap((object) => {
+    const holder = PROPS.filter(
+      (prop) =>
+        Math.abs(object.x - prop.x) <= prop.w / 2 + 0.1 &&
+        Math.abs(object.z - prop.z) <= prop.d / 2 + 0.1,
+    ).sort((a, b) => a.w * a.d - b.w * b.d)[0];
+    return holder ? [[object.id, holder] as const] : [];
+  }),
+);
 
 /** 바닥 바탕색. 구역 색은 여기에 섞어 쓴다. */
 const FLOOR_BASE = [0x28, 0x22, 0x1c] as const;
@@ -76,8 +128,6 @@ function mixWithFloor(accent: string, amount: number): string {
   return mixed;
 }
 
-type Look = { accent: string; uniform: string; skin: string };
-
 export function StationCanvas({ onReady }: { onReady: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const readyRef = useRef(false);
@@ -90,6 +140,9 @@ export function StationCanvas({ onReady }: { onReady: () => void }) {
 
     const player: Vec2 = { x: SPAWN.x, z: SPAWN.z };
     let facing = Math.PI;
+    // 걸음 위상. 다리가 엇갈리고 몸이 뜨는 리듬이 여기서 나온다.
+    let gait = 0;
+    let walking = false;
     const pressed = new Set<string>();
     const visited = new Set<string>();
     let raf = 0;
@@ -142,6 +195,16 @@ export function StationCanvas({ onReady }: { onReady: () => void }) {
     const toScreenX = (x: number) => (x - player.x) * scale + width / 2;
     const toScreenZ = (z: number) => (z - player.z) * scale + height / 2;
 
+    // 미니어처 렌더러에 넘길 좌표계. 매 프레임 `scale`만 갱신해 쓴다.
+    const view: View = { ctx, scale, toX: toScreenX, toZ: toScreenZ };
+
+    /** 세워 올린 물건이 화면에 걸치는지. 정거장 절반은 늘 화면 밖이라 미리 걸러 낸다. */
+    const onScreen = (box: Box, h: number) =>
+      toScreenX(box.x + box.w / 2) > -8 &&
+      toScreenX(box.x - box.w / 2) < width + 8 &&
+      toScreenZ(box.z + box.d / 2) > -8 &&
+      toScreenZ(box.z - box.d / 2) - h * TILT * scale < height + 8;
+
     /* ── 입력 ─────────────────────────────────────────────────────────── */
     const press = (event: KeyboardEvent) => pressed.add(event.code);
     const release = (event: KeyboardEvent) => pressed.delete(event.code);
@@ -158,120 +221,11 @@ export function StationCanvas({ onReady }: { onReady: () => void }) {
     window.addEventListener("arcadia:move", virtualMove);
 
     /**
-     * 정거장을 걸어 다니는 인물.
+     * 지금 손이 닿는 대상의 이름과 자리.
      *
-     * 예전에는 동그란 머리에 타원 몸통, 색 테두리와 삼각형 코를 붙였다. 그건 보드게임 말의
-     * 어법이라, 회화에 가까운 인물 일러스트와 같은 화면에 놓으면 화면 전체가 장난감이 된다.
-     *
-     * 지금은 위에서 내려다본 사람의 덩어리로 그린다. 몸은 거의 검정이고 한쪽 모서리에만
-     * 빛이 걸린다. 얼굴은 어둠에 절반쯤 잠긴 채로 보인다 — 누구인지는 알아볼 수 있지만
-     * 캐릭터 아이콘으로는 읽히지 않는다.
+     * 이름표를 하나만 띄우기 위해 쓴다. `height`는 그 대상이 바닥에서 얼마나 솟아 있는지로,
+     * 이름표를 머리 위나 물건 위에 걸어야 실루엣을 가리지 않는다.
      */
-    const drawFigure = (
-      x: number,
-      z: number,
-      angle: number,
-      look: Look,
-      characterId: string | null,
-      highlighted: boolean,
-    ) => {
-      const px = toScreenX(x);
-      const pz = toScreenZ(z);
-      const headR = scale * 0.37;
-      // 빛은 화면 왼쪽 위에서 온다. 벽 그림자가 아래로 지는 것과 방향을 맞춘다.
-      const rim = -Math.PI * 0.75;
-
-      ctx.save();
-      ctx.translate(px, pz);
-
-      // 바닥 그림자. 인물이 바닥에 눌러앉아 보이도록 넓고 짙게.
-      const cast = ctx.createRadialGradient(0, scale * 0.22, 0, 0, scale * 0.22, scale * 0.95);
-      cast.addColorStop(0, "rgba(0,0,0,.62)");
-      cast.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = cast;
-      ctx.fillRect(-scale, -scale * 0.6, scale * 2, scale * 1.7);
-
-      ctx.save();
-      ctx.rotate(-angle);
-      // 어깨. 좌우가 살짝 다른 다각형이라 도형이 아니라 사람으로 읽힌다.
-      ctx.beginPath();
-      ctx.moveTo(-scale * 0.52, scale * 0.1);
-      ctx.quadraticCurveTo(-scale * 0.6, -scale * 0.3, -scale * 0.24, -scale * 0.4);
-      ctx.quadraticCurveTo(0, -scale * 0.48, scale * 0.26, -scale * 0.38);
-      ctx.quadraticCurveTo(scale * 0.62, -scale * 0.28, scale * 0.5, scale * 0.12);
-      ctx.quadraticCurveTo(scale * 0.3, scale * 0.42, 0, scale * 0.44);
-      ctx.quadraticCurveTo(-scale * 0.32, scale * 0.42, -scale * 0.52, scale * 0.1);
-      ctx.closePath();
-      ctx.fillStyle = "#191108";
-      ctx.fill();
-      // 빛이 닿는 쪽 모서리에만 제복 색이 스친다.
-      ctx.save();
-      ctx.clip();
-      const shoulder = ctx.createLinearGradient(
-        Math.cos(rim) * scale * 0.6, Math.sin(rim) * scale * 0.6,
-        -Math.cos(rim) * scale * 0.5, -Math.sin(rim) * scale * 0.5,
-      );
-      shoulder.addColorStop(0, look.uniform);
-      shoulder.addColorStop(0.42, "rgba(0,0,0,0)");
-      ctx.globalAlpha = 0.5;
-      ctx.fillStyle = shoulder;
-      ctx.fillRect(-scale, -scale, scale * 2, scale * 2);
-      ctx.restore();
-      ctx.restore();
-
-      // 머리. 바라보는 쪽으로 조금 밀어 둔다. 위에서 내려다보면 실제로 그렇게 보인다.
-      const headX = Math.sin(angle) * scale * 0.1;
-      const headZ = -scale * 0.12 + Math.cos(angle) * scale * 0.06;
-      const head = characterId ? loadedPortrait(characterId) : null;
-      ctx.beginPath();
-      ctx.arc(headX, headZ, headR, 0, Math.PI * 2);
-      if (head) {
-        const { face } = characterFor(characterId!);
-        const source = face.r * head.naturalHeight;
-        ctx.save();
-        ctx.clip();
-        ctx.drawImage(
-          head,
-          face.x * head.naturalWidth - source,
-          face.y * head.naturalHeight - source,
-          source * 2, source * 2,
-          headX - headR, headZ - headR, headR * 2, headR * 2,
-        );
-        // 얼굴 절반을 어둠에 담근다. 밝은 초상이 그대로 뜨면 스티커처럼 붙어 보인다.
-        const shade2 = ctx.createLinearGradient(
-          headX + Math.cos(rim) * headR, headZ + Math.sin(rim) * headR,
-          headX - Math.cos(rim) * headR, headZ - Math.sin(rim) * headR,
-        );
-        shade2.addColorStop(0, "rgba(12,9,7,0)");
-        shade2.addColorStop(1, "rgba(8,6,5,.58)");
-        ctx.fillStyle = shade2;
-        ctx.fillRect(headX - headR, headZ - headR, headR * 2, headR * 2);
-        ctx.restore();
-      } else {
-        ctx.fillStyle = "#17110d";
-        ctx.fill();
-      }
-      // 빛이 걸리는 쪽 테두리만 밝힌다. 원을 다 두르면 다시 아이콘이 된다.
-      ctx.beginPath();
-      ctx.arc(headX, headZ, headR, rim - 0.85, rim + 0.85);
-      ctx.strokeStyle = look.accent;
-      ctx.lineWidth = Math.max(1, scale * 0.035);
-      ctx.globalAlpha = 0.5;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.restore();
-
-      if (highlighted) {
-        // 초점은 원이 아니라 바닥에 깔리는 빛으로 알린다.
-        const pool = ctx.createRadialGradient(px, pz, scale * 0.3, px, pz, scale * 1.5);
-        pool.addColorStop(0, "rgba(216,199,173,.16)");
-        pool.addColorStop(1, "rgba(216,199,173,0)");
-        ctx.fillStyle = pool;
-        ctx.fillRect(px - scale * 1.6, pz - scale * 1.6, scale * 3.2, scale * 3.2);
-      }
-    };
-
-    /** 지금 손이 닿는 대상의 이름과 자리. 이름표를 하나만 띄우기 위해 쓴다. */
     const focusTarget = (id: string) => {
       const crew = MAP_CREW.find((item) => item.id === id);
       if (crew) {
@@ -280,15 +234,18 @@ export function StationCanvas({ onReady }: { onReady: () => void }) {
         return {
           x: crew.x,
           z: crew.z,
+          height: FIGURE_HEIGHT,
           name: interviewed ? `${person.name} · 진술 확보` : person.name,
           color: zoneColor(crew.accent),
         };
       }
       const object = MAP_OBJECTS.find((item) => item.id === id);
       if (!object) return null;
+      const holder = PROP_UNDER.get(object.id);
       return {
         x: object.x,
         z: object.z,
+        height: holder ? propHeight(holder.kind) : 0.8,
         name: INVESTIGATION_OBJECTS[object.id]?.title ?? object.id,
         color: "#e0d3bd",
       };
@@ -301,14 +258,14 @@ export function StationCanvas({ onReady }: { onReady: () => void }) {
      * 정거장이 아니라 안내판을 보게 되고, 둥근 상자 자체가 화면을 아기자기하게 만든다.
      * 지금은 손이 닿는 대상 하나에만, 상자 없이 인출선 한 줄로 붙인다.
      */
-    const drawLabel = (x: number, z: number, text: string, color: string) => {
+    const drawLabel = (x: number, z: number, height: number, text: string, color: string) => {
       const px = toScreenX(x);
-      const pz = toScreenZ(z);
-      const lift = scale * 1.35;
+      const pz = toScreenZ(z) - height * TILT * scale;
+      const lift = scale * 0.75;
       ctx.strokeStyle = "rgba(216,199,173,.34)";
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(px, pz - scale * 0.5);
+      ctx.moveTo(px, pz - scale * 0.14);
       ctx.lineTo(px, pz - lift);
       ctx.stroke();
 
@@ -332,16 +289,20 @@ export function StationCanvas({ onReady }: { onReady: () => void }) {
       const frozen = state.layer !== "playing" || settings.guideOpen || settings.open;
       if (frozen) {
         pressed.clear();
+        walking = false;
         if (state.focusedId !== null) state.setFocused(null);
         return;
       }
 
       const axes = axesFrom(pressed);
-      if (axes.x !== 0 || axes.z !== 0) {
+      walking = axes.x !== 0 || axes.z !== 0;
+      if (walking) {
         const next = moveBy(player, axes.x, axes.z, deltaSeconds);
         player.x = next.x;
         player.z = next.z;
         facing = facingFrom(axes.x, axes.z, facing);
+        // 걷는 동안에만 위상이 돈다. 멈추면 그 자리에서 멎어야 다음 걸음이 자연스럽다.
+        gait += deltaSeconds * 11;
         state.markMoved();
       }
 
@@ -357,6 +318,7 @@ export function StationCanvas({ onReady }: { onReady: () => void }) {
       const discovered = new Set(discoveredIds);
       const scanning = scanUntil > now;
 
+      view.scale = scale;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = "#0a0806";
       ctx.fillRect(0, 0, width, height);
@@ -471,9 +433,12 @@ export function StationCanvas({ onReady }: { onReady: () => void }) {
        *
        * 정거장의 벽은 사각형 57장이지만 눈에는 이어진 한 덩어리로 보여야 한다. 사각형마다
        * 테두리와 하이라이트를 그리면 이어진 벽 한가운데에 이음매가 생겨 구조가 흩어진다.
-       * 그래서 세 번에 나눠 칠한다. 모두 불투명이라 겹쳐도 색이 진해지지 않고 하나로 합쳐진다.
+       * 그래서 종류별로 나눠 칠한다. 모두 불투명이라 겹쳐도 색이 진해지지 않고 하나로 합쳐진다.
        *
-       *   1. 바닥에 지는 그림자   2. 벽면   3. 위쪽 모서리 하이라이트
+       *   1. 바닥 그림자   2. 윗면   3. 이쪽을 향한 벽면   4. 위쪽 모서리 하이라이트
+       *
+       * 집기와 같은 기울기로 세워 올린다. 벽만 바닥에 눕혀 두면 방 안의 물건은 모형인데
+       * 방 자체는 도면이라 두 어법이 한 화면에서 싸운다.
        */
       const wallRect = (wall: (typeof WALLS)[number], grow = 0, dz = 0) =>
         [
@@ -483,6 +448,7 @@ export function StationCanvas({ onReady }: { onReady: () => void }) {
           wall.d * scale + grow * 2,
         ] as const;
 
+      const wallLift = WALL_HEIGHT * TILT * scale;
       const drop = Math.max(2, scale * 0.16);
       ctx.fillStyle = "#080605";
       for (const wall of WALLS) {
@@ -491,8 +457,13 @@ export function StationCanvas({ onReady }: { onReady: () => void }) {
       }
       ctx.fillStyle = "#3d342b";
       for (const wall of WALLS) {
-        const [x, y, w, d] = wallRect(wall);
+        const [x, y, w, d] = wallRect(wall, 0, -wallLift);
         ctx.fillRect(x, y, w, d);
+      }
+      ctx.fillStyle = "#241e18";
+      for (const wall of WALLS) {
+        const [x, y, w, d] = wallRect(wall);
+        ctx.fillRect(x, y + d - wallLift, w, wallLift);
       }
       // 하이라이트는 위쪽 모서리에만 얹고, 다른 벽에 가려진 구간은 건너뛴다.
       // 이 확인을 빼면 벽이 만나는 모서리마다 밝은 토막이 남아 벽이 토막 나 보인다.
@@ -507,25 +478,53 @@ export function StationCanvas({ onReady }: { onReady: () => void }) {
             Math.abs(edgeZ - other.z) < other.d / 2 - 0.05,
         );
         if (hidden) continue;
-        const [x, y, w] = wallRect(wall);
+        const [x, y, w] = wallRect(wall, 0, -wallLift);
         ctx.fillRect(x, y, w, capHeight);
       }
 
-      // 집기. 3D 장면의 콜라이더를 그대로 옮긴 것이라 책상 하나까지 자리가 같다.
-      // 위쪽 모서리를 밝혀 두면 바닥 도장과 구별되고 높이가 있는 물건으로 읽힌다.
-      for (const prop of PROPS) {
-        const left = toScreenX(prop.x - prop.w / 2);
-        const top = toScreenZ(prop.z - prop.d / 2);
-        const w = prop.w * scale;
-        const d = prop.d * scale;
-        // 집기도 벽처럼 그림자 → 면 → 윗면 순으로 각지게 쌓는다.
-        ctx.fillStyle = "#070605";
-        ctx.fillRect(left + 1, top + Math.max(1.5, scale * 0.1), w, d);
-        ctx.fillStyle = "#2b241d";
-        ctx.fillRect(left, top, w, d);
-        ctx.fillStyle = "rgba(216,199,173,.14)";
-        ctx.fillRect(left, top, w, Math.max(1, scale * 0.055));
+      /*
+       * 집기와 사람.
+       *
+       * 둘을 한 줄에 세워 z 순서대로 그린다. 따로 그리면 사람이 늘 책상 앞이거나 늘 책상
+       * 뒤라서, 방을 가로질러도 공간이 아니라 겹쳐 놓은 두 장의 그림으로 보인다.
+       */
+      const figures: FigureState[] = MAP_CREW.map((crew) => {
+        const distance = Math.hypot(crew.x - player.x, crew.z - player.z);
+        return {
+          x: crew.x,
+          z: crew.z,
+          // 가까이 가면 이쪽을 돌아본다. 멀면 3D에 배치된 방향 그대로 서 있다.
+          angle: distance < 6 ? Math.atan2(player.x - crew.x, player.z - crew.z) : crew.facing,
+          characterId: crew.id,
+          // 서 있는 사람도 아주 조금은 움직인다. 사람마다 위상을 어긋내야 인형 진열이 아니다.
+          gait: now / 1100 + crew.x,
+          moving: false,
+          highlighted: focusedId === crew.id,
+        };
+      });
+      figures.push({
+        x: player.x,
+        z: player.z,
+        angle: facing,
+        characterId: "PLAYER",
+        gait,
+        moving: walking,
+        highlighted: false,
+      });
+      figures.sort((a, b) => a.z - b.z);
+
+      let nextFigure = 0;
+      const figuresUpTo = (depth: number) => {
+        while (nextFigure < figures.length && figures[nextFigure].z <= depth) {
+          drawFigure(view, figures[nextFigure]);
+          nextFigure += 1;
+        }
+      };
+      for (const { prop, depth } of SORTED_PROPS) {
+        figuresUpTo(depth);
+        if (onScreen(prop, propHeight(prop.kind))) drawProp(view, prop);
       }
+      figuresUpTo(Infinity);
 
       /*
        * 조사 지점 표식.
@@ -533,16 +532,26 @@ export function StationCanvas({ onReady }: { onReady: () => void }) {
        * 맥동하는 마름모는 "여기 눌러요"라고 외치는 모바일 게임의 어법이라, 회화적인 인물
        * 일러스트와 같은 화면에 놓이면 화면 전체가 장난감이 된다. 대신 카메라 초점 마크처럼
        * 네 귀퉁이만 짧게 긋는다. 표식이 물건을 가리키지 않고 물건 주위를 비워 둔다.
+       *
+       * 물건이 세워지면서 표식도 그 실루엣을 감싸야 한다. 바닥 자국만 두르면 정작 눈이 가는
+       * 몸통은 표식 밖에 남는다.
        */
-      const bracket = (px: number, pz: number, half: number, color: string, weight: number) => {
-        const arm = half * 0.42;
+      const bracket = (
+        px: number,
+        py: number,
+        halfX: number,
+        halfY: number,
+        color: string,
+        weight: number,
+      ) => {
+        const arm = Math.min(halfX, halfY) * 0.45;
         ctx.strokeStyle = color;
         ctx.lineWidth = weight;
         ctx.beginPath();
-        for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
-          ctx.moveTo(px + sx * half, pz + sz * (half - arm));
-          ctx.lineTo(px + sx * half, pz + sz * half);
-          ctx.lineTo(px + sx * (half - arm), pz + sz * half);
+        for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+          ctx.moveTo(px + sx * halfX, py + sy * (halfY - arm));
+          ctx.lineTo(px + sx * halfX, py + sy * halfY);
+          ctx.lineTo(px + sx * (halfX - arm), py + sy * halfY);
         }
         ctx.stroke();
       };
@@ -554,45 +563,33 @@ export function StationCanvas({ onReady }: { onReady: () => void }) {
           : REQUIRED.has(object.id)
             ? "#b8563f"
             : "rgba(214,199,175,.85)";
+        const holder = PROP_UNDER.get(object.id);
+        const lift = (holder ? propHeight(holder.kind) : 0.8) * TILT * scale;
         const px = toScreenX(object.x);
-        const pz = toScreenZ(object.z);
+        const py = toScreenZ(object.z) - lift / 2;
         // 스캔 중에만 숨을 쉰다. 평소에는 가만히 있어야 화면이 조용하다.
         const breath = scanning ? (Math.sin(now / 260 + object.x) + 1) / 2 : 0;
-        const half = scale * (0.62 + breath * 0.3);
+        const grow = 1 + breath * 0.35;
+        const halfX =
+          Math.max(scale * 0.5, ((holder?.w ?? 0.7) / 2) * scale + scale * 0.24) * grow;
+        const halfY =
+          Math.max(scale * 0.5, ((holder?.d ?? 0.7) / 2) * scale + lift / 2 + scale * 0.24) * grow;
         if (scanning && !found) {
           ctx.globalAlpha = 0.35 + breath * 0.4;
-          bracket(px, pz, half * 1.5, color, Math.max(1, scale * 0.05));
+          bracket(px, py, halfX * 1.45, halfY * 1.45, color, Math.max(1, scale * 0.05));
           ctx.globalAlpha = 1;
         }
-        bracket(px, pz, half, color, Math.max(1.2, scale * (found ? 0.045 : 0.06)));
+        bracket(px, py, halfX, halfY, color, Math.max(1.2, scale * (found ? 0.045 : 0.06)));
         if (!found) {
-          // 가운데 점 하나. 아직 손대지 않았다는 표시다.
+          // 점 하나. 물건 바로 위에 떠서 아직 손대지 않았다는 표시가 된다.
           ctx.fillStyle = color;
-          ctx.fillRect(px - scale * 0.05, pz - scale * 0.05, scale * 0.1, scale * 0.1);
+          ctx.fillRect(px - scale * 0.05, py - halfY - scale * 0.22, scale * 0.1, scale * 0.1);
         }
       }
-
-      // 승무원
-      for (const crew of MAP_CREW) {
-        const distance = Math.hypot(crew.x - player.x, crew.z - player.z);
-        // 가까이 가면 이쪽을 돌아본다. 멀면 3D에 배치된 방향 그대로 서 있다.
-        const angle =
-          distance < 6 ? Math.atan2(player.x - crew.x, player.z - crew.z) : crew.facing;
-        drawFigure(
-          crew.x,
-          crew.z,
-          angle,
-          { accent: zoneColor(crew.accent), uniform: crew.uniform, skin: crew.skin },
-          crew.id,
-          focusedId === crew.id,
-        );
-      }
-
-      drawFigure(player.x, player.z, facing, PLAYER_LOOK, "PLAYER", false);
 
       // 이름은 지금 손이 닿는 하나만. 인물까지 다 그린 뒤라야 플레이어 뒤로 숨지 않는다.
       const focused = focusedId ? focusTarget(focusedId) : null;
-      if (focused) drawLabel(focused.x, focused.z, focused.name, focused.color);
+      if (focused) drawLabel(focused.x, focused.z, focused.height, focused.name, focused.color);
 
       // 조명. 지나온 방은 희미하게 남고 지금 서 있는 자리만 환하다.
       if (shadeCtx) {

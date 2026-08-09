@@ -13,6 +13,7 @@ import {
 import { INVESTIGATION_OBJECTS } from "./investigation";
 import { CHARACTERS, characterIdFromNpc } from "./characters";
 import { PLAYER_RADIUS, REACH, blockedAt, hasStandingSpotNear, onFloorAt } from "../domain/movement";
+import { propHeight } from "../ui/miniatures";
 
 /**
  * `stationMap.ts`는 3D 장면에서 뽑아낸 생성물이다. 추출기가 조용히 어긋나면 벽이 사라지거나
@@ -55,6 +56,30 @@ describe("정거장 평면도", () => {
       .filter((object) => object.kind !== "PERSON")
       .map((object) => object.id);
     expect([...mapped].sort()).toEqual([...expected].sort());
+  });
+
+  /**
+   * 조사 지점은 눈에 보이는 물건 위에 있어야 한다.
+   *
+   * 화면은 지점을 품는 집기를 찾아 그 물건의 키만큼 표식을 띄운다. 품는 집기가 없으면
+   * 표식만 허공에 떠서 "여기 뭔가 있는데 아무것도 안 보인다"가 되고, 그건 조사 지점이
+   * 아니라 버그로 보인다.
+   */
+  it("모든 조사 지점이 집기 위에 있다", () => {
+    for (const object of MAP_OBJECTS) {
+      const holder = PROPS.some(
+        (prop) =>
+          Math.abs(object.x - prop.x) <= prop.w / 2 + 0.1 &&
+          Math.abs(object.z - prop.z) <= prop.d / 2 + 0.1,
+      );
+      expect(holder, `${object.id}을 담은 집기가 없습니다`).toBe(true);
+    }
+  });
+
+  it("모든 집기가 그릴 수 있는 종류를 갖는다", () => {
+    for (const prop of PROPS) {
+      expect(propHeight(prop.kind), `${prop.kind}의 높이가 없습니다`).toBeGreaterThan(0);
+    }
   });
 
   it("평면도의 승무원이 용의자 로스터와 맞는다", () => {
