@@ -41,8 +41,13 @@ public class GameSession {
     private Instant currentAttemptStartedAt;
     private Instant lastPolledAt;
 
+    // Hibernate가 @Enumerated(STRING) 컬럼에 "생성 시점의" enum 값만 허용하는 CHECK 제약을
+    // 자동으로 만든다. ddl-auto=update는 기존 제약을 갱신하지 않으므로, SessionState에 새 값을
+    // 추가해도(INCORRECT 등) 이미 떠 있는 DB는 여전히 옛 제약을 들고 있어 INSERT/UPDATE가
+    // 500(DataIntegrityViolationException)으로 실패한다. columnDefinition을 명시해 Hibernate가
+    // 이 제약을 만들지 않게 한다 — enum 값 유효성은 애플리케이션 레이어(Java enum)가 책임진다.
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "varchar(32)")
     private SessionState state;
 
     private String worldTemplateId;
