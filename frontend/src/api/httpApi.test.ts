@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { httpApi } from "./httpApi";
-import { ArcadiaApiError } from "./errors";
+import { ArcadiaApiError, isSessionLost } from "./errors";
 import type { TheoryDraft } from "../store/gameStore";
 
 type FetchCall = { url: string; method: string; body: unknown };
@@ -126,7 +126,6 @@ describe("inspectObject", () => {
         isCore: false,
         revealedFacts: [],
         linkedClueIds: [],
-        suspectEffects: [],
         hasPendingConnection: false,
       },
     ]);
@@ -158,9 +157,30 @@ describe("inspectObject", () => {
       isCore: true,
       revealedFacts: [{ factId: "FACT-SETUP", statement: "소피아가 점검을 예약했다." }],
       linkedClueIds: ["CLUE-ACCESS-HISTORY"],
-      suspectEffects: [{ characterId: "SOPHIA", effect: "SUPPORTS" }],
       hasPendingConnection: true,
     });
+  });
+
+  // 배제 판정이 이 값을 그대로 정답으로 쓴다. 화면까지 흘러가면 최종 추리가 받아쓰기가 된다.
+  it("서버가 준 용의자 영향은 수첩으로 넘기지 않는다", async () => {
+    respond = (path) => {
+      if (path.includes("/explore")) {
+        return envelope([
+          {
+            clueId: "CLUE-ALIBI",
+            title: "의무실 출입 기록",
+            clueType: "DIGITAL",
+            playerText: "...",
+            suspectEffects: [{ characterId: "MAYA", effect: "EXCLUDES" }],
+          },
+        ]);
+      }
+      return envelope(null);
+    };
+
+    const result = await httpApi.inspectObject("game_effect", "MD_MEDICAL_STORAGE");
+
+    expect(result.discoveredEvidence[0]).not.toHaveProperty("suspectEffects");
   });
 
   it("조사는 탐사만 하고 사건기록 검색은 건드리지 않는다", async () => {
@@ -440,6 +460,34 @@ describe("오류 정규화", () => {
       code: "SERVER_ERROR",
       retryable: true,
     });
+  });
+
+  // 복구 화면은 이 판정 하나로 세션을 버릴지 정한다. 전송 계층과 어긋나면 안 된다.
+  it("사라진 세션 조회는 세션 소실로 판정된다", async () => {
+    respond = () => ({
+      status: 404,
+      body: { success: false, message: "세션을 찾을 수 없습니다.", data: null },
+    });
+
+    const error = await httpApi.fetchCaseState("game_gone").catch((caught) => caught);
+    expect(isSessionLost(error)).toBe(true);
+  });
+
+  it("서버 오류나 통신 실패는 세션 소실로 판정하지 않는다", async () => {
+    respond = () => ({
+      status: 503,
+      body: { success: false, message: "잠시 후 다시 시도해주세요.", data: null },
+    });
+
+    const serverError = await httpApi.fetchCaseState("game_11").catch((caught) => caught);
+    expect(isSessionLost(serverError)).toBe(false);
+
+    vi.stubGlobal("fetch", async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    const networkError = await httpApi.fetchCaseState("game_11").catch((caught) => caught);
+    expect(networkError).toMatchObject({ code: "NETWORK_ERROR", retryable: true });
+    expect(isSessionLost(networkError)).toBe(false);
   });
 });
 

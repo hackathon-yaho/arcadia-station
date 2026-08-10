@@ -131,7 +131,6 @@ function mockEvidenceFor(objectId: string): DiscoveredEvidence | null {
   // 문맥 필드도 실제 응답과 같은 모양으로 채운다. 오브젝트 ID를 씨앗으로 삼아 세션마다
   // 같은 결과가 나오게 하고, 연결과 미해결 표시가 화면에서 실제로 보이도록 섞는다.
   const seed = objectId.length;
-  const effect = seed % 3 === 0 ? "EXCLUDES" : seed % 3 === 1 ? "SUPPORTS" : "NEUTRAL";
   return {
     clueId: `${MOCK_CLUE_PREFIX}${objectId}`,
     title: object.evidenceLabel,
@@ -143,7 +142,6 @@ function mockEvidenceFor(objectId: string): DiscoveredEvidence | null {
       { factId: `FACT-${objectId}`, statement: `${object.evidenceLabel}에 해당하는 기록이 남아 있다.` },
     ],
     linkedClueIds: [],
-    suspectEffects: [{ characterId: SUSPECTS[seed % SUSPECTS.length].id, effect }],
     hasPendingConnection: seed % 4 === 0,
   };
 }

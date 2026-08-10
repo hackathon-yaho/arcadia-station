@@ -146,12 +146,6 @@ export default function App() {
           linkedClueIds: inspected
             .filter((other, otherIndex) => other !== objectId && otherIndex % 4 === index % 4)
             .map((other) => `MOCK-${other}`),
-          suspectEffects: [
-            {
-              characterId: ["MAYA", "JUNHO", "SOPHIA", "KASIM", "YUNA"][index % 5],
-              effect: (["SUPPORTS", "EXCLUDES", "NEUTRAL"] as const)[index % 3],
-            },
-          ],
           hasPendingConnection: index % 4 === 0,
         }));
         const theory = {

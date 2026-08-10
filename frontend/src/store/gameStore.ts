@@ -65,6 +65,34 @@ export type TrialResult = {
   correctAccusation: boolean;
 };
 
+/**
+ * 저장 데이터에서 되살아난 단서.
+ *
+ * 옛 빌드가 남긴 레코드에는 나중에 필수가 된 문맥 필드가 아예 없다. 타입이 아니라 저장
+ * 시점의 계약이 달랐던 것이므로, 되살릴 때는 실제 모양을 그대로 적는다.
+ */
+type StoredEvidence = Omit<
+  DiscoveredEvidence,
+  "isCore" | "revealedFacts" | "linkedClueIds" | "hasPendingConnection"
+> &
+  Partial<DiscoveredEvidence>;
+
+/**
+ * 되살린 단서를 현재 계약에 맞춘다.
+ *
+ * 문맥 필드가 없는 레코드를 수첩이 그대로 그리면 `undefined.map`으로 화면 전체가 죽는다.
+ * 서버 공개 상태를 한 번 받으면 온전한 레코드로 덮이지만, 렌더가 언제나 그보다 빠르다.
+ */
+function normalizeEvidence(record: StoredEvidence): DiscoveredEvidence {
+  return {
+    ...record,
+    isCore: record.isCore ?? false,
+    revealedFacts: record.revealedFacts ?? [],
+    linkedClueIds: record.linkedClueIds ?? [],
+    hasPendingConnection: record.hasPendingConnection ?? false,
+  };
+}
+
 export const resilientLocalStorage: StateStorage = {
   getItem: (name) => {
     const value = localStorage.getItem(name);
@@ -357,6 +385,23 @@ export const useGameStore = create<GameState>()(persist((set, get) => ({
     scanUntil: 0,
     hasMoved: state.hasMoved,
   }),
+  /**
+   * 복구할 때마다 저장 데이터를 현재 계약에 맞춘다.
+   *
+   * `migrate`는 저장된 버전이 현재와 다를 때만 돈다. 그래서 필드를 추가하면서 `version`을
+   * 올리지 않으면 옛 저장 데이터가 그대로 화면까지 올라간다. 실제로 단서 문맥 필드가 그렇게
+   * 들어와 수첩이 죽었다. 버전과 무관하게 반드시 지나는 이 자리에서 다듬는다.
+   *
+   * 저장된 게 없으면 `persisted`는 undefined다.
+   */
+  merge: (persisted, current) => {
+    const state = (persisted ?? {}) as Partial<GameState>;
+    return {
+      ...current,
+      ...state,
+      evidence: (state.evidence ?? []).map(normalizeEvidence),
+    };
+  },
   version: 2,
   migrate: (persistedState, fromVersion) => {
     const state = persistedState as Partial<GameState>;
