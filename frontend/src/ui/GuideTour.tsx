@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 
 type Placement = "top" | "bottom" | "left" | "right" | "center";
+/** 대상이 화면에 없을 때 카드를 띄울 자리. */
+type FallbackSpot = "center" | "bottom";
 
 export type TourStep = {
   title: string;
@@ -8,6 +10,11 @@ export type TourStep = {
   /** 짚어 줄 화면 요소. 없으면 화면 가운데에 설명만 띄운다. */
   target?: string;
   placement?: Placement;
+  /**
+   * 대상이 상황에 따라 숨는 경우(조사 안내처럼 가까이 가야 뜨는 요소) 대신 쓸 자리.
+   * 기본은 화면 가운데.
+   */
+  fallbackSpot?: FallbackSpot;
 };
 
 /**
@@ -36,6 +43,9 @@ export const PLAY_TOUR_STEPS: TourStep[] = [
       "조사할 수 있는 자리에는 마름모 표식이 떠 있습니다. 가까이 가면 화면 아래에 이름이 뜨고, 그때 E를 누르면 조사하거나 말을 겁니다. 붉은 표식이 1일차 필수 기록입니다.",
     target: '[data-tour="prompt"]',
     placement: "top",
+    // 가까이 간 대상이 없으면 이 안내판 자체가 숨어 있다. 그때는 실제로 이름이 뜨는 자리인
+    // 화면 아래쪽에 설명을 둔다.
+    fallbackSpot: "bottom",
   },
   {
     title: "조사 스캔 — 무엇을 조사할지 모를 때",
@@ -139,17 +149,28 @@ type CardPosition = {
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), Math.max(min, max));
 
-function cardPosition(rect: DOMRect | null, placement: Placement): CardPosition {
+/** 짚어 줄 대상이 없을 때 쓰는 자리. 가로는 항상 화면 가운데. */
+function fallbackPosition(spot: FallbackSpot): CardPosition {
+  const left = Math.max(EDGE, (window.innerWidth - CARD_WIDTH) / 2);
+  if (spot === "bottom") {
+    // 아래쪽 HUD(이동 안내·신호 표시)를 덮지 않을 만큼만 띄운다.
+    return { left, bottom: Math.max(EDGE, window.innerHeight * 0.14) };
+  }
+  return { left, top: Math.max(EDGE, window.innerHeight * 0.3) };
+}
+
+function cardPosition(
+  rect: DOMRect | null,
+  placement: Placement,
+  fallbackSpot: FallbackSpot,
+): CardPosition {
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
   const maxLeft = viewportWidth - CARD_WIDTH - EDGE;
   const maxTop = viewportHeight - CARD_MAX_HEIGHT - EDGE;
 
   if (!rect || placement === "center") {
-    return {
-      left: Math.max(EDGE, (viewportWidth - CARD_WIDTH) / 2),
-      top: Math.max(EDGE, viewportHeight * 0.3),
-    };
+    return fallbackPosition(rect ? "center" : fallbackSpot);
   }
 
   const centeredLeft = clamp(
@@ -201,7 +222,14 @@ export function GuideTour({
       return;
     }
     const element = document.querySelector(step.target);
-    setRect(element ? element.getBoundingClientRect() : null);
+    if (!element) {
+      setRect(null);
+      return;
+    }
+    // 숨어 있는 요소는 크기가 0으로 잡힌다. 그대로 쓰면 강조 사각형과 카드가 화면 왼쪽 위
+    // 모서리로 끌려가 잘리므로, 대상이 없는 것으로 본다.
+    const measured = element.getBoundingClientRect();
+    setRect(measured.width > 0 && measured.height > 0 ? measured : null);
   }, [step.target]);
 
   // 단계가 바뀌면 대상 위치를 다시 잡는다. 창 크기가 변할 때도 따라가야 한다.
@@ -241,7 +269,11 @@ export function GuideTour({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose, goBack, goNext]);
 
-  const position = cardPosition(rect, step.placement ?? "center");
+  const position = cardPosition(
+    rect,
+    step.placement ?? "center",
+    step.fallbackSpot ?? "center",
+  );
   // 대상만 남기고 주변을 덮는다. 사각형 네 장이라 잘라내기 없이도 강조가 된다.
   const scrims = rect
     ? [
