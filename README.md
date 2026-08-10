@@ -47,7 +47,18 @@ PASS: 실제 GEMINI API 호출과 AI 단서 생성을 확인했습니다.
 
 ## 3. 프론트엔드·백엔드·AI 전체 테스트
 
-세 터미널을 따로 열어 아래 순서로 실행합니다. Docker Desktop이 먼저 실행되어 있어야 합니다.
+세 터미널을 따로 열어 아래 순서로 실행합니다. **아래 명령은 모두 Windows PowerShell
+(`powershell.exe`) 전용입니다.** Git Bash·WSL·cmd.exe에 그대로 붙여넣으면 `$env:` 구문이
+조용히 실패하거나(환경변수가 안 잡힌 채 다음 줄로 넘어감) 경로가 깨질 수 있으니 반드시
+PowerShell 창을 새로 열어 실행합니다.
+
+Docker Desktop이 먼저 실행되어 있어야 합니다. 트레이 아이콘이 뜬 직후에는 엔진이 아직
+준비 중일 수 있으므로, 아래 명령이 성공(오류 없이 정보 출력)할 때까지 기다린 뒤 터미널 B로
+넘어갑니다.
+
+```powershell
+docker info
+```
 
 ### 터미널 A — AI 서버
 
@@ -68,24 +79,46 @@ docker compose `
 
 ### 터미널 C — 프론트엔드 HTTP 모드
 
+환경변수는 셸에 인라인으로 넘기지 말고 `frontend/.env.local` 파일에 적습니다. 인라인으로
+넘기면 셸(특히 Git Bash)에 따라 `/api`처럼 `/`로 시작하는 값이 엉뚱한 경로로 바뀌어 프론트가
+"게임 서버와 통신하지 못했습니다" 오류를 내는 경우가 있었습니다. `.env.local`은 Vite가
+파일로 직접 읽으므로 이 문제가 없습니다.
+
+`frontend/.env.local` 파일을 만들고(이미 있으면 아래 세 줄로 덮어씁니다) 다음 내용을 넣습니다.
+
+```text
+VITE_API_MODE=http
+VITE_API_BASE_URL=/api
+VITE_API_PROXY_TARGET=http://127.0.0.1:8080
+```
+
+그다음 실행합니다.
+
 ```powershell
 cd <arcadia-station 경로>\frontend
 npm.cmd install
-
-$env:VITE_API_MODE='http'
-$env:VITE_API_BASE_URL='/api'
-$env:VITE_API_PROXY_TARGET='http://127.0.0.1:8080'
-
 npm.cmd run dev
 ```
 
-브라우저 주소는 프론트 터미널에 표시됩니다(보통 `http://127.0.0.1:5173`).
-`LOCAL-*` 세션 ID가 보이면 프론트 mock 모드이므로 터미널 C의 `VITE_API_MODE=http` 설정을
-확인합니다.
+콘솔에 찍히는 실제 주소를 확인합니다(보통 `http://127.0.0.1:5173`) — 5173 포트가 이미
+사용 중이면 Vite가 자동으로 5174 등으로 올라가므로, 브라우저는 항상 터미널 C 로그에 찍힌
+URL로 접속합니다. `LOCAL-*` 세션 ID가 보이면 아직 mock 모드이므로 `frontend/.env.local`의
+`VITE_API_MODE=http` 설정을 다시 확인합니다.
 
 ## 4. 실제 Gemini 호출 확인법
 
 AI 서버를 실행한 **터미널 A**의 로그가 기준입니다.
+
+새 게임을 시작하면 백엔드가 곧바로 `202 VALIDATING`을 반환하고, 실제 사건 생성은 뒤에서
+비동기로 진행됩니다(실제 Gemini 호출이라 수십 초~2분 걸릴 수 있습니다). 이 동안 화면이
+멈춘 것처럼 보여도 오류가 아니니, 터미널 A에 `purpose=CASE_GENERATION`과 함께
+`[AI-API][SUCCESS]`가 찍힐 때까지 기다립니다.
+
+또한 AI 서버는 사건·심문 세션을 메모리에만 저장하므로, AI 서버를 재시작하면 그 이전에
+만든 사건은 사라집니다. 백엔드 DB에는 세션 기록이 남아 브라우저가 예전 세션을 계속
+불러오려 하지만, 그 세션으로 심문을 시도하면 "지금은 대답할 수 없습니다" 같은 폴백
+문구가 뜹니다 — 버그가 아니라 방어 로직입니다. 서버를 새로 켠 뒤에는 이전 세션을 잇지
+말고 항상 새 게임으로 시작해서 확인합니다.
 
 | 플레이 동작 | 호출 여부 | 성공 로그 |
 |---|---|---|
