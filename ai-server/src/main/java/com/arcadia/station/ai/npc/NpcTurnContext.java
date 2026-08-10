@@ -1,5 +1,7 @@
 package com.arcadia.station.ai.npc;
 
+import com.arcadia.station.ai.casegen.CaseBlueprint;
+import com.arcadia.station.ai.template.WorldTemplate;
 import java.util.List;
 
 public record NpcTurnContext(
@@ -7,7 +9,10 @@ public record NpcTurnContext(
         String characterId,
         String displayName,
         String occupation,
+        String publicProfile,
+        WorldTemplate.NpcPersona persona,
         List<String> personalityTraits,
+        String initialClaim,
         String question,
         List<String> presentedClueIds,
         List<ConversationTurn> conversationHistory,
@@ -15,7 +20,12 @@ public record NpcTurnContext(
         List<String> revealableFactIds,
         List<QuestionCandidate> questionCandidates
 ) {
-    public record AllowedFact(String factId, String statement, boolean truthValue) {}
+    public record AllowedFact(
+            String factId,
+            CaseBlueprint.FactKind kind,
+            String statement,
+            boolean truthValue
+    ) {}
 
     /** 이미 검증된 최근 문답만 모델에 전달하는 플레이어별 NPC 메모리 뷰. */
     public record ConversationTurn(

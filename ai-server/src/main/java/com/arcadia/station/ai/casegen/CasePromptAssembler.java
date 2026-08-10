@@ -54,6 +54,9 @@ public class CasePromptAssembler {
             alibis의 진술, clues.title/playerText, evidenceRecords.title/body,
             npcKnowledge.recommendedQuestionTopics, redHerrings.presentation,
             solution.nonCulpritExclusions.reason은 자연스러운 한국어 서술만 사용하라.
+            "비위", "권한 문제", "이상 징후"처럼 뜻이 뭉뚱그려진 행정식 표현만 쓰지 말고,
+            무엇을 누가 어떻게 했는지 플레이어가 바로 이해할 수 있게 풀어 써라. 예를 들어
+            화물 기록의 문제라면 목록에서 무엇이 빠졌고 어떤 흔적이 남았는지 설명하라.
             그 문장에는 characterId, locationId, systemId, recordId, factId, 영문 enum,
             대문자_밑줄 형식의 내부 명령 코드, metadata 값을 넣지 마라. 내부 식별자는
             구조화 필드와 metadata에서만 사용하고, 화면용 문장에는 사람·장소·행동의 한국어

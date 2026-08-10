@@ -47,6 +47,11 @@ public class NpcContextFactory {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "No interrogation context for characterId: " + characterId
                 ));
+        String initialClaim = blueprint.alibis().stream()
+                .filter(alibi -> alibi.characterId().equals(characterId))
+                .map(CaseBlueprint.Alibi::initialClaim)
+                .findFirst()
+                .orElse("");
         // In split deployment the game backend owns discovery state for EXPLORE/CONNECT.
         // The authenticated request is authoritative; this server only rejects foreign IDs.
         Set<String> caseClueIds = blueprint.clues().stream()
@@ -77,6 +82,7 @@ public class NpcContextFactory {
                 .filter(java.util.Objects::nonNull)
                 .map(fact -> new NpcTurnContext.AllowedFact(
                         fact.factId(),
+                        fact.kind(),
                         fact.statement(),
                         fact.truthValue()
                 ))
@@ -100,7 +106,10 @@ public class NpcContextFactory {
                 character.id(),
                 character.displayName(),
                 character.occupation(),
+                character.publicProfile(),
+                character.persona(),
                 character.personalityTraits(),
+                initialClaim,
                 question,
                 List.copyOf(presentedClueIds),
                 conversationHistory,

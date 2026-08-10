@@ -90,6 +90,60 @@ class NpcEmotionPolicyTest {
                 .doesNotContain("차분히 정리해서");
     }
 
+    @Test
+    void mayaAnswersDiscoveryQuestionWithHerOwnRoleInsteadOfGenericRefusal() {
+        NpcTurnContext context = new NpcTurnContext(
+                "session",
+                "MAYA",
+                "마야 헨드릭스",
+                "부사령관",
+                "사건 다음 날 아침 사령관실의 이상을 발견해 보안 절차를 가동했다.",
+                null,
+                List.of("침착한 지휘관", "논리정연"),
+                "부사령관 집무실에서 감사 기록을 검토했습니다.",
+                "발견 당시 상황을 다시 설명해 주십시오.",
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()
+        );
+
+        NpcEmotionPolicy.Reply reply = policy.fallback(context);
+
+        assertThat(reply.emotion()).isEqualTo(NpcTurnResponse.Emotion.CALM);
+        assertThat(reply.dialogue())
+                .contains("사령관실", "보안 절차")
+                .doesNotContain("제가 본 건 여기까지예요");
+    }
+
+    @Test
+    void yunaAnswersNeutralTimelineQuestionWithCargoClaimWithoutBecomingDefensive() {
+        NpcTurnContext context = new NpcTurnContext(
+                "session",
+                "YUNA",
+                "유나 조",
+                "화물관리관",
+                "화물창고와 도킹 물자 기록을 관리한다.",
+                null,
+                List.of("현장 감각", "솔직함", "자존심"),
+                "화물칸에서 재고를 확인했습니다.",
+                "사건 당일 밤에는 어디에 있었습니까?",
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()
+        );
+
+        NpcEmotionPolicy.Reply reply = policy.fallback(context);
+
+        assertThat(reply.emotion()).isEqualTo(NpcTurnResponse.Emotion.CALM);
+        assertThat(reply.dialogue())
+                .contains("화물칸에서 재고를 확인했습니다", "봉인 번호")
+                .doesNotContain("저를 의심");
+    }
+
     private NpcTurnContext context(
             List<String> traits,
             String question,
@@ -101,7 +155,10 @@ class NpcEmotionPolicyTest {
                 "YUNA",
                 "유나 조",
                 "화물관리관",
+                "화물창고와 도킹 물자 기록을 관리한다.",
+                null,
                 traits,
+                "화물칸에서 재고를 확인했습니다.",
                 question,
                 presentedClueIds,
                 history,

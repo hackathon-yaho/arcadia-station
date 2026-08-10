@@ -9,7 +9,9 @@ public class NpcResponseGuard {
 
     private static final Set<String> GENERIC_ASSISTANT_PHRASES = Set.of(
             "차분히 정리해서 답하겠습니다",
-            "확인할 수 있는 기록을 기준으로 하나씩 살펴보죠"
+            "확인할 수 있는 기록을 기준으로 하나씩 살펴보죠",
+            "제가 본 건 여기까지예요",
+            "그 부분은 지금 답하고 싶지 않아요"
     );
 
     private final NpcEmotionPolicy emotions;
@@ -27,6 +29,14 @@ public class NpcResponseGuard {
             return false;
         }
         if (GENERIC_ASSISTANT_PHRASES.stream().anyMatch(response.dialogue()::contains)) {
+            return false;
+        }
+        String normalizedDialogue = normalize(response.dialogue());
+        boolean repeatsPreviousDialogue = context.conversationHistory().stream()
+                .map(NpcTurnContext.ConversationTurn::dialogue)
+                .map(this::normalize)
+                .anyMatch(normalizedDialogue::equals);
+        if (repeatsPreviousDialogue) {
             return false;
         }
         Set<String> revealable = Set.copyOf(context.revealableFactIds());
@@ -101,5 +111,9 @@ public class NpcResponseGuard {
                 .findFirst()
                 .orElse("제시한 기록과 관련된 작업이 있었던 것은 확인됩니다.");
         return emotions.acknowledging(context, statement);
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.replaceAll("\\s+", " ").trim();
     }
 }

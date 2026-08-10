@@ -120,6 +120,35 @@
         "publicProfile": {
           "type": "string"
         },
+        "persona": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "age": {
+              "type": "integer",
+              "minimum": 18
+            },
+            "background": {
+              "type": "string"
+            },
+            "baselineAttitude": {
+              "type": "string"
+            },
+            "pressureResponse": {
+              "type": "string"
+            },
+            "speechHabits": {
+              "$ref": "#/$defs/strings"
+            }
+          },
+          "required": [
+            "age",
+            "background",
+            "baselineAttitude",
+            "pressureResponse",
+            "speechHabits"
+          ]
+        },
         "personalityTraits": {
           "$ref": "#/$defs/strings"
         },
@@ -183,6 +212,7 @@
         "occupation",
         "suspect",
         "publicProfile",
+        "persona",
         "personalityTraits",
         "skills",
         "physicalAccess",

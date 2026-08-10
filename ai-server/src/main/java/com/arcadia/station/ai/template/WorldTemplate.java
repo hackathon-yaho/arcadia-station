@@ -28,6 +28,7 @@ public record WorldTemplate(
             String occupation,
             boolean suspect,
             String publicProfile,
+            NpcPersona persona,
             List<String> personalityTraits,
             List<String> skills,
             List<String> physicalAccess,
@@ -37,6 +38,18 @@ public record WorldTemplate(
             List<RelationshipSeed> relationshipSeeds,
             String privateBackground,
             List<String> forbiddenCapabilities
+    ) {}
+
+    /**
+     * 플레이어에게 알려져도 되는 인물 연기 기준이다. 사건의 비밀이나 범행 여부는 넣지 않고,
+     * 실AI 프롬프트와 안전 폴백이 같은 말투를 유지할 수 있도록 공개 배경만 둔다.
+     */
+    public record NpcPersona(
+            int age,
+            String background,
+            String baselineAttitude,
+            String pressureResponse,
+            List<String> speechHabits
     ) {}
 
     public record SystemPermission(String systemId, List<String> allowedOperations) {}
