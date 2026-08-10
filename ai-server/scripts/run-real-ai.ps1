@@ -55,7 +55,7 @@ Set-DefaultEnvironmentValue -Name 'AI_INTERNAL_API_KEY' -Value 'arcadia-local-sh
 Set-DefaultEnvironmentValue -Name 'GEMINI_TEXT_MODEL' -Value 'gemini-3.6-flash'
 Set-DefaultEnvironmentValue -Name 'GEMINI_EMBEDDING_MODEL' -Value 'gemini-embedding-2'
 Set-DefaultEnvironmentValue -Name 'AI_CASE_GENERATION_TIMEOUT' -Value '180s'
-Set-DefaultEnvironmentValue -Name 'AI_CASE_GENERATION_MAX_RETRIES' -Value '2'
+Set-DefaultEnvironmentValue -Name 'AI_CASE_GENERATION_MAX_RETRIES' -Value '1'
 [Environment]::SetEnvironmentVariable('PORT', "$Port", 'Process')
 [Environment]::SetEnvironmentVariable('AI_ENABLED', 'true', 'Process')
 [Environment]::SetEnvironmentVariable('AI_OFFLINE_MODE', 'false', 'Process')
