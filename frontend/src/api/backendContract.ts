@@ -174,6 +174,13 @@ export type BackendClue = {
   isCore?: boolean;
   revealedFacts?: { factId: string; statement: string }[];
   linkedClueIds?: string[];
+  /**
+   * 서버는 내려주지만 화면은 쓰지 않는다.
+   *
+   * 배제 판정이 이 값을 그대로 정답으로 쓰기 때문에(`solution.nonCulpritExclusions`),
+   * 카드에 적으면 최종 추리의 배제 항목이 받아쓰기가 된다. 계약을 정확히 남겨 두되
+   * `toEvidence`에서 의도적으로 버린다.
+   */
   suspectEffects?: { characterId: string; effect: "SUPPORTS" | "EXCLUDES" | "NEUTRAL" }[];
   hasPendingConnection?: boolean;
 };

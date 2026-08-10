@@ -252,7 +252,7 @@ function toEvidence(sessionId: string, clue: BackendClue): DiscoveredEvidence {
     isCore: clue.isCore ?? false,
     revealedFacts: clue.revealedFacts ?? [],
     linkedClueIds: clue.linkedClueIds ?? [],
-    suspectEffects: clue.suspectEffects ?? [],
+    // suspectEffects는 일부러 옮기지 않는다. 그 값이 곧 배제 판정의 정답이라 화면에 쓰지 않는다.
     hasPendingConnection: clue.hasPendingConnection ?? false,
   };
 }

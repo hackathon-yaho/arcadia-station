@@ -26,6 +26,7 @@ import {
   useSubmitVerdict,
 } from "../api/hooks";
 import { validateTheory } from "../domain/theoryValidation";
+import { isSessionLost } from "../api/errors";
 import { ROLE_SOURCE_FIELD } from "../api/backendContract";
 import { GuideTour, NOTEBOOK_TOUR_STEPS, PLAY_TOUR_STEPS } from "./GuideTour";
 import { Portrait, type PortraitState } from "./Portrait";
@@ -690,17 +691,16 @@ const EVIDENCE_TAG_LABELS: Record<EvidenceTag, string> = {
 
 const EVIDENCE_TAGS = Object.keys(EVIDENCE_TAG_LABELS) as EvidenceTag[];
 
-const SUSPECT_EFFECT_LABELS: Record<string, string> = {
-  SUPPORTS: "혐의를 뒷받침",
-  EXCLUDES: "혐의에서 배제",
-  NEUTRAL: "판단 보류",
-};
-
 /**
  * 증거 한 장이 사건 안에서 갖는 위치.
  *
- * 서버가 알려주는 것은 세 가지다. 이 기록이 말해 주는 사실, 같은 사실을 가리키는 다른 기록,
- * 그리고 아직 맞물리지 않은 데가 남았는지. 어느 역할의 정답인지는 알려주지 않는다.
+ * 보여주는 것은 재료뿐이다. 이 기록이 말해 주는 사실, 같은 사실을 가리키는 다른 기록,
+ * 그리고 아직 맞물리지 않은 데가 남았는지.
+ *
+ * 서버는 단서마다 "누구의 혐의를 뒷받침하고 누구를 배제하는지"(`suspectEffects`)도 함께
+ * 내려주지만 화면에는 쓰지 않는다. 배제 판정이 그 값을 그대로 정답으로 쓰기 때문에, 그걸
+ * 카드에 적으면 최종 추리의 배제 항목이 받아쓰기가 된다. 배제 근거는 사실 문장과 알리바이,
+ * 심문을 대조해서 플레이어가 직접 골라야 한다.
  */
 function EvidenceContext({
   record,
@@ -715,12 +715,7 @@ function EvidenceContext({
     .map((clueId) => evidence.find((item) => item.clueId === clueId))
     .filter((item): item is DiscoveredEvidence => Boolean(item));
 
-  if (
-    links.length === 0 &&
-    record.revealedFacts.length === 0 &&
-    record.suspectEffects.length === 0 &&
-    !record.hasPendingConnection
-  ) {
+  if (links.length === 0 && record.revealedFacts.length === 0 && !record.hasPendingConnection) {
     return null;
   }
 
@@ -734,19 +729,6 @@ function EvidenceContext({
               <li key={fact.factId}>{fact.statement}</li>
             ))}
           </ul>
-        </div>
-      )}
-
-      {record.suspectEffects.length > 0 && (
-        <div className="evidence-effects">
-          {record.suspectEffects.map((effect) => (
-            <em
-              key={`${effect.characterId}-${effect.effect}`}
-              className={`is-${effect.effect.toLowerCase()}`}
-            >
-              {suspectProfile(effect.characterId).name} · {SUSPECT_EFFECT_LABELS[effect.effect]}
-            </em>
-          ))}
         </div>
       )}
 
@@ -2449,8 +2431,39 @@ function ResultScreen() {
   );
 }
 
+/**
+ * 복구한 세션이 서버에 없을 때.
+ *
+ * 진행 상황은 사건 세션에 묶여 있고 클라이언트는 그 ID만 들고 있다. 서버가 세션을 잃으면
+ * 되살릴 방법이 없는데, 정거장을 그대로 띄워 두면 조사도 심문도 조용히 404가 나서 무엇이
+ * 잘못됐는지 알 길이 없다. 여기서 끊고 새 사건으로 보낸다.
+ *
+ * 세션을 버리는 것은 되돌릴 수 없으므로 자동으로 하지 않는다. 잘못 라우팅된 404 같은 경우를
+ * 위해 다시 확인할 길도 함께 둔다.
+ */
+function LostSessionOverlay({ onRetry }: { onRetry: () => void }) {
+  const resetSession = useGameStore((state) => state.resetSession);
+
+  return (
+    <section className="fatal-shell is-overlay" role="alert" aria-label="사건 세션 복구 실패">
+      <span>SESSION LOST // ARK-072</span>
+      <h1>이 사건 기록이 서버에 없습니다.</h1>
+      <p>
+        저장된 진행 상황은 사건 세션에 묶여 있는데, 서버가 그 세션을 더는 가지고 있지 않습니다.
+        조사·심문·최종 추리가 모두 거절되므로 이어서 진행할 수 없습니다. 새 사건을 시작하면
+        정상으로 돌아옵니다. 그래픽·오디오 설정은 유지됩니다.
+      </p>
+      <div>
+        <button type="button" onClick={onRetry}>다시 확인</button>
+        <button type="button" onClick={resetSession}>새 사건 시작</button>
+      </div>
+    </section>
+  );
+}
+
 export function GameUI() {
   const layer = useGameStore((state) => state.layer);
+  const sessionId = useGameStore((state) => state.sessionId);
   const selectedId = useGameStore((state) => state.selectedId);
   const guideOpen = useSettingsStore((state) => state.guideOpen);
   const closeGuide = useSettingsStore((state) => state.closeGuide);
@@ -2460,10 +2473,18 @@ export function GameUI() {
     () => (selectedId ? INVESTIGATION_OBJECTS[selectedId]?.title : null),
     [selectedId],
   );
+  // 복구한 세션이 서버에 실제로 남아 있는지 확인한다. 조사·심문·판정이 전부 이 ID에 걸려
+  // 있어서, 서버가 모르는 ID로 정거장에 들어가면 화면만 멀쩡하고 아무것도 되지 않는다.
+  // 수첩을 열기 전에 단서 기준선을 맞추는 일도 여기서 함께 끝난다.
+  const caseState = useCaseState(layer === "opening" ? null : sessionId);
 
   useEffect(() => {
     document.title = title ? `${title} // ARCADIA` : "ARCADIA // INCIDENT 72";
   }, [title]);
+
+  if (isSessionLost(caseState.error)) {
+    return <LostSessionOverlay onRetry={() => void caseState.refetch()} />;
+  }
 
   return (
     <>

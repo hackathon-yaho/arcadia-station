@@ -37,12 +37,6 @@ export type RevealedFact = {
   statement: string;
 };
 
-/** 이 단서가 특정 인물에게 미치는 영향. */
-export type SuspectEffect = {
-  characterId: string;
-  effect: "SUPPORTS" | "EXCLUDES" | "NEUTRAL";
-};
-
 export type DiscoveredEvidence = {
   clueId: string;
   title: string;
@@ -56,7 +50,6 @@ export type DiscoveredEvidence = {
   revealedFacts: RevealedFact[];
   /** 같은 사실을 가리키는 다른 기록. 이미 확보한 것만 담긴다. */
   linkedClueIds: string[];
-  suspectEffects: SuspectEffect[];
   /**
    * 이 기록이 아직 열리지 않은 기록의 재료인지.
    *

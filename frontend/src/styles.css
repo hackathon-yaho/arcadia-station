@@ -1954,31 +1954,6 @@ html[data-reduced-motion="true"] *::after {
   word-break: keep-all;
 }
 
-.evidence-effects {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.evidence-effects em {
-  padding: 4px 7px;
-  border: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 9.5px;
-  font-style: normal;
-  letter-spacing: 0.02em;
-}
-
-.evidence-effects em.is-supports {
-  border-color: rgba(207, 115, 97, 0.42);
-  color: #d8a89e;
-}
-
-.evidence-effects em.is-excludes {
-  border-color: rgba(195, 186, 169, 0.42);
-  color: var(--mint);
-}
-
 .evidence-links > div {
   display: flex;
   flex-wrap: wrap;
@@ -5108,6 +5083,13 @@ html[data-reduced-motion="true"] *::after {
   border-color: var(--alert);
   color: #14100c;
   background: var(--alert);
+}
+
+/* 게임 안에서 뜨는 복구 화면. 에러 바운더리와 달리 정거장 위를 덮어야 한다. */
+.fatal-shell.is-overlay {
+  position: absolute;
+  z-index: 30;
+  inset: 0;
 }
 
 .mobile-controls {
