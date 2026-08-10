@@ -62,7 +62,7 @@ export const INVESTIGATION_OBJECTS: Record<string, InvestigationObject> = {
     kind: "DIGITAL",
     summary: "사령관실은 정거장 주 계통과 분리된 환경 제어 장치를 갖고 있다.",
     detail:
-      "산소 농도, 기압, 온도 변화가 로컬 저장 장치에 기록된다. 현재 화면에는 D-0 야간의 센서 샘플이 잠금 보존 상태로 남아 있다.",
+      "산소 농도, 기압, 온도 변화가 로컬 저장 장치에 기록된다. 현재 화면에는 사건 당일 밤의 센서 샘플이 잠금 보존 상태로 남아 있다.",
     observation: "심층 분석은 D2에 독립 센서와 정비 로그를 함께 비교한다.",
     evidenceLabel: "사령관실 환경 원시 로그",
     required: true,
@@ -151,11 +151,11 @@ export const INVESTIGATION_OBJECTS: Record<string, InvestigationObject> = {
     title: "생명유지 정비 단말",
     eyebrow: "엔지니어링 // 정비 원본",
     kind: "DIGITAL",
-    summary: "D-0 야간 생명유지 진단 주기와 환경 제어 작업 서명을 확인한다.",
+    summary: "사건 당일 밤 생명유지 진단 주기와 환경 제어 작업 서명을 확인한다.",
     detail:
       "정기 점검으로 분류된 작업 하나가 사령관실 로컬 센서의 변화 직전 실행됐다. 작업 범위와 실제 환경 변화는 일치하지 않는다.",
     observation: "정비 서명, 실행 위치와 물리 패널 상태를 함께 검증해야 한다.",
-    evidenceLabel: "D-0 생명유지 정비 원본",
+    evidenceLabel: "사건 당일 생명유지 정비 원본",
     required: false,
   },
   CM_SECURITY_ARCHIVE: {
@@ -177,7 +177,7 @@ export const INVESTIGATION_OBJECTS: Record<string, InvestigationObject> = {
     title: "에어록 로컬 안전 로그",
     eyebrow: "화물·도킹 // 압력 기록",
     kind: "DIGITAL",
-    summary: "에어록과 화물 리프트의 D-0 야간 로컬 안전 이벤트를 조회한다.",
+    summary: "에어록과 화물 리프트의 사건 당일 밤 로컬 안전 이벤트를 조회한다.",
     detail:
       "치명적인 감압이나 하역 장비 충돌 이벤트는 기록되지 않았다. 화물 시스템의 살상 수단이 실제 사용됐는지를 배제하는 자료다.",
     observation: "가능한 수단과 실제 실행된 수단을 구분할 수 있다.",
@@ -216,7 +216,7 @@ export const INVESTIGATION_OBJECTS: Record<string, InvestigationObject> = {
     title: "숙소 출입 로컬 버퍼",
     eyebrow: "승무원 숙소 // 야간 동선",
     kind: "DIGITAL",
-    summary: "개인실 6개의 D-0 야간 출입 이벤트를 시간순으로 비교한다.",
+    summary: "개인실 6개의 사건 당일 밤 출입 이벤트를 시간순으로 비교한다.",
     detail:
       "본인 입실은 정상 기록되고 타인 출입에는 별도 경고 태그가 붙는다. 중앙 보안 로그와 독립된 로컬 버퍼다.",
     observation: "야간 알리바이는 입실 기록뿐 아니라 이후 퇴실 가능성까지 검토해야 한다.",
@@ -270,7 +270,7 @@ export const INVESTIGATION_OBJECTS: Record<string, InvestigationObject> = {
     kind: "PERSON",
     summary: "통신·보안 로그를 직접 수정할 수 있는 유일한 인물이다.",
     detail:
-      "D-4 태양풍 경보를 전 승무원에게 공지했으며 격리 시점을 가장 정확히 알고 있었다.",
+      "사건 4일 전 태양풍 경보를 전 승무원에게 공지했으며 격리 시점을 가장 정확히 알고 있었다.",
     observation: "중앙 로그보다 각 장치의 로컬 원본을 우선 확인해야 한다.",
     evidenceLabel: "카심 1차 진술",
     required: false,
@@ -298,10 +298,10 @@ export const REQUIRED_SCENE_IDS = [
 ];
 
 export const TIMELINE = [
-  { time: "D-4", title: "태양풍 사전 경보", detail: "카심이 전 승무원에게 공지" },
-  { time: "D-0", title: "격리 시작", detail: "외부 통신 두절 · 비상 프로토콜 발동" },
-  { time: "D-0 밤", title: "사망 추정 구간", detail: "정확한 시점 조사 필요" },
-  { time: "D1 07:20", title: "시신 발견", detail: "마야 헨드릭스가 보안담당관 호출" },
+  { time: "사건 4일 전", title: "태양풍 사전 경보", detail: "카심이 전 승무원에게 공지" },
+  { time: "사건 당일", title: "격리 시작", detail: "외부 통신 두절 · 비상 프로토콜 발동" },
+  { time: "사건 당일 밤", title: "사망 추정 구간", detail: "정확한 시점 조사 필요" },
+  { time: "사건 다음 날 07:20", title: "시신 발견", detail: "마야 헨드릭스가 보안담당관 호출" },
 ];
 
 export const SUSPECTS = [
@@ -376,7 +376,7 @@ export const NPC_DIALOGUE: Record<
       },
       {
         id: "whereabouts",
-        label: "D-0 야간에는 어디에 있었습니까?",
+        label: "사건 당일 밤에는 어디에 있었습니까?",
         response:
           "엔지니어링에서 태양풍 부하를 감시했습니다. 정비 단말 세션과 생명유지 진단 주기를 확인하면 됩니다.",
       },
@@ -429,7 +429,7 @@ export const NPC_DIALOGUE: Record<
         id: "warning",
         label: "태양풍 도달 시각을 언제 확정했습니까?",
         response:
-          "D-4 최초 관측 때 전 승무원에게 범위를 공지했고, D-0 여섯 시간 전에 최종 도달 시각을 갱신했습니다. 모두가 경보를 받았습니다.",
+          "사건 4일 전 최초 관측 때 전 승무원에게 범위를 공지했고, 사건 당일 여섯 시간 전에 최종 도달 시각을 갱신했습니다. 모두가 경보를 받았습니다.",
       },
       {
         id: "leak",
@@ -452,7 +452,7 @@ export const NPC_DIALOGUE: Record<
       },
       {
         id: "whereabouts",
-        label: "D-0 야간의 동선을 말하십시오.",
+        label: "사건 당일 밤의 동선을 말해 주세요.",
         response:
           "화물칸에서 자동 하역 장비를 고정하고 숙소로 돌아갔어요. 장비 종료 기록과 숙소 출입 기록이 남아 있을 겁니다.",
       },

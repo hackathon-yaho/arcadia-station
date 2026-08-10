@@ -248,7 +248,7 @@ describe("sendInterrogationMessage", () => {
     const call = lastCallTo("/interrogations");
     expect(call?.url).toBe("/api/v1/sessions/game_4/interrogations/JUNHO/turns");
     expect(call?.body).toMatchObject({
-      question: "D-0 야간에는 어디에 있었습니까?",
+      question: "사건 당일 밤에는 어디에 있었습니까?",
       presentedClueIds: [],
     });
     expect(message.response).toBe("그 시간엔 엔지니어링에 있었습니다.");

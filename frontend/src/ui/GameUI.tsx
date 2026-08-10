@@ -180,7 +180,7 @@ function OpeningOverlay() {
       </header>
 
       <div className="opening-content">
-        <p className="opening-kicker">격리 프로토콜 발령 · D1 07:24</p>
+        <p className="opening-kicker">격리 프로토콜 발령 · 사건 다음 날 07:24</p>
         <h1>
           ARCADIA
           <span>INCIDENT 72</span>
@@ -261,7 +261,7 @@ const PREP_STORY: Record<SessionPrepStage, { caption: string; lines: string[] }>
     caption: "사건 파일 생성",
     lines: [
       "정거장 로그 복호화 중",
-      "D-0 출입 이벤트 재정렬 중",
+      "사건 당일 출입 이벤트 재정렬 중",
       "승무원 인사 기록 대조 중",
       "사망 추정 시각 구간 계산 중",
       "현장 물리 흔적 목록화 중",
@@ -1516,7 +1516,7 @@ function InterrogationPanel() {
       <div className="interrogation-backdrop" />
       <header className="interrogation-topbar">
         <div>
-          <span>INTERROGATION CHANNEL // D1</span>
+          <span>INTERROGATION CHANNEL // DAY 1</span>
           <strong>{dialogue.callSign}</strong>
         </div>
         <div className="interrogation-state">
@@ -1833,7 +1833,7 @@ function DayReview() {
   };
 
   return (
-    <section className="day-review-shell" aria-label="D1 조사 정리">
+    <section className="day-review-shell" aria-label="1일차 조사 정리">
       <div className="day-review-atmosphere" />
       <header>
         <span>INVESTIGATION CYCLE COMPLETE</span>
@@ -1891,7 +1891,7 @@ function DayReview() {
             disabled={completeDay.isPending}
             onClick={continueToDayTwo}
           >
-            <span>{completeDay.isPending ? "D1 기록 봉인 중" : "D2 조사 시작"}</span>
+            <span>{completeDay.isPending ? "1일차 기록 봉인 중" : "2일차 조사 시작"}</span>
             <i>→</i>
           </button>
         </div>
